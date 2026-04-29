@@ -1,0 +1,25 @@
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.log
+~$*
+
+# Python caches and environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Runtime caches
+GPUCache/
+*/GPUCache/
+Cache/
+Code Cache/
+DawnCache/
+ShaderCache/
