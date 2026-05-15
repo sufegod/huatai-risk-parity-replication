@@ -9,7 +9,7 @@ warnings.filterwarnings('ignore')
 
 # ================= 配置参数 =================
 VERSION = '0.02'
-FILE_PATH = 'ETF风险平价回测数据.xlsx'
+FILE_PATH = '../数据/原始数据/ETF风险平价回测数据.xlsx'
 SHEET_NAME = '日涨跌幅'
 FEE_RATE = 0.0005  # 单边万分之五交易费率
 RISK_FREE_RATE = 0.0  # 计算夏普比率时的无风险利率

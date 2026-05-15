@@ -1,3 +1,11 @@
+import os
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+MPLCONFIG_DIR = BASE_DIR / '.matplotlib'
+MPLCONFIG_DIR.mkdir(exist_ok=True)
+os.environ.setdefault('MPLCONFIGDIR', str(MPLCONFIG_DIR))
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,8 +17,11 @@ warnings.filterwarnings('ignore')
 
 # ================= 配置参数 =================
 VERSION = '0.13'
-FILE_PATH_ETF = '风险平价回测数据.xlsx'
-FILE_PATH_MOM = r'C:\Users\tstone1\Documents\trae_projects\风险平价回测\华泰风险平价策略复现\买方宏观预期指标合成\预期动量\增长预期动量与通胀预期动量数据.csv'
+FILE_PATH_ETF = BASE_DIR.parent / '数据' / '原始数据' / '风险平价回测数据.xlsx'
+FILE_PATH_MOM = BASE_DIR.parent / '买方宏观预期指标合成' / '预期动量' / '增长预期动量与通胀预期动量数据.csv'
+METRICS_DIR = BASE_DIR / '回测指标'
+CHART_DIR = BASE_DIR / '回测图表'
+MONTH_END_FREQ = 'M'
 SHEET_NAME = '日涨跌幅'
 FEE_RATE = 0.0005
 REPO_FEE_RATE = 0.000001
@@ -87,7 +98,7 @@ def calculate_metrics(ret_series, rf_series, margin_series=None):
     sharpe = (excess_ret.mean() * 252) / ann_excess_vol if ann_excess_vol > 0 else 0.0
 
     max_dd = ((nav / nav.cummax()) - 1).min()
-    monthly_ret = ret_series.resample('ME').apply(lambda x: (1 + x).prod() - 1)
+    monthly_ret = ret_series.resample(MONTH_END_FREQ).apply(lambda x: (1 + x).prod() - 1)
     win_rate = (monthly_ret > 0).sum() / len(monthly_ret) if len(monthly_ret) > 0 else 0.0
 
     res = {
@@ -105,8 +116,10 @@ def calculate_metrics(ret_series, rf_series, margin_series=None):
 # ================= 主流程 =================
 def main():
     print(f"正在执行回测框架 v{VERSION}...")
+    METRICS_DIR.mkdir(exist_ok=True)
+    CHART_DIR.mkdir(exist_ok=True)
 
-    df_raw = pd.read_excel(FILE_PATH_ETF, sheet_name=SHEET_NAME, index_col=0, parse_dates=True)
+    df_raw = pd.read_excel(str(FILE_PATH_ETF), sheet_name=SHEET_NAME, index_col=0, parse_dates=True)
     df_raw = df_raw.dropna(how='all')
 
     # 原油主连早期缺失值用布油连续替代，随后剔除布油数据
@@ -133,8 +146,9 @@ def main():
     repo_net_yield = np.maximum((repo_shifted / 365.0) * calendar_days - REPO_FEE_RATE, 0.0)
 
     m_ratios = np.array([MARGIN_RATIOS.get(a, 1.0) for a in assets])
-    df_mom = pd.read_csv(FILE_PATH_MOM, index_col=0, parse_dates=True).resample('ME').last().ffill()
-    month_ends = df_etf.resample('ME').last().index
+    with FILE_PATH_MOM.open('r', encoding='utf-8-sig') as mom_file:
+        df_mom = pd.read_csv(mom_file, index_col=0, parse_dates=True).resample(MONTH_END_FREQ).last().ffill()
+    month_ends = df_etf.resample(MONTH_END_FREQ).last().index
 
     df_q = pd.DataFrame({n: df_etf[[a for a in al if a in assets]].mean(axis=1) for n, al in MACRO_QUADRANTS.items()})
 
@@ -208,8 +222,8 @@ def main():
     df_navs = pd.DataFrame(index=df_etf.loc[first_date:].index)
     for s in strats:
         df_navs[s] = (1 + ret_dfs[s].loc[first_date:]).cumprod()
-    navs_filename = f'策略每日净值走势_v{VERSION}.csv'
-    df_navs.to_csv(navs_filename, encoding='utf-8-sig')
+    navs_filename = METRICS_DIR / f'策略每日净值走势_v{VERSION}.csv'
+    df_navs.to_csv(str(navs_filename), encoding='utf-8-sig')
 
     print(f"正在计算年度与全局指标...")
     all_metrics = []
@@ -242,12 +256,12 @@ def main():
     cols_order = [c for c in cols_order if c in df_m_all.columns]
     df_m_all = df_m_all[cols_order]
 
-    metrics_filename = f'年度及全局回测指标_v{VERSION}.csv'
-    df_m_all.to_csv(metrics_filename, index=False, encoding='utf-8-sig')
+    metrics_filename = METRICS_DIR / f'年度及全局回测指标_v{VERSION}.csv'
+    df_m_all.to_csv(str(metrics_filename), index=False, encoding='utf-8-sig')
 
     print("\n[全局回测总览]")
     print(df_m_all[(df_m_all['回测区间'] == '全局 (Total)') & (df_m_all['组合/资产'].isin(strats))].set_index(
-        '组合/资产').to_markdown())
+        '组合/资产').to_string())
 
     print(f"\n正在生成月度仓位明细...")
     all_weight_dfs = []
@@ -257,8 +271,8 @@ def main():
         all_weight_dfs.append(df_w_temp)
 
     df_weights_all = pd.concat(all_weight_dfs, ignore_index=True)
-    weights_filename = f'策略月度仓位明细_v{VERSION}.csv'
-    df_weights_all.to_csv(weights_filename, index=False, encoding='utf-8-sig')
+    weights_filename = METRICS_DIR / f'策略月度仓位明细_v{VERSION}.csv'
+    df_weights_all.to_csv(str(weights_filename), index=False, encoding='utf-8-sig')
 
     print(f"\n数据文件已生成：\n 1. {navs_filename}\n 2. {metrics_filename}\n 3. {weights_filename}")
 
@@ -292,7 +306,7 @@ def main():
     for i, s in enumerate(strats): plot_w(axes[i + 1], s, weight_recs[s])
 
     plt.tight_layout()
-    plt.savefig(f'回测图表_v{VERSION}.png', dpi=300)
+    plt.savefig(str(CHART_DIR / f'回测图表_v{VERSION}.png'), dpi=300)
 
 
 if __name__ == '__main__':

@@ -9,7 +9,7 @@ warnings.filterwarnings('ignore')
 
 # ================= 配置参数 =================
 VERSION = '0.11'
-FILE_PATH_ETF = '风险平价回测数据.xlsx'
+FILE_PATH_ETF = '../数据/原始数据/风险平价回测数据.xlsx'
 FILE_PATH_MOM = r'C:\Users\tstone1\Documents\trae_projects\风险平价回测\华泰风险平价策略复现\买方宏观预期指标合成\预期动量\增长预期动量与通胀预期动量数据.csv'
 SHEET_NAME = '日涨跌幅'
 FEE_RATE = 0.0005
