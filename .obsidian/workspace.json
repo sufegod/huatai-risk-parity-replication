@@ -1,0 +1,193 @@
+{
+  "main": {
+    "id": "10db3d876bb09dc5",
+    "type": "split",
+    "children": [
+      {
+        "id": "a09b0f81c2978256",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "11b1341e0fc828ee",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "策略复现与回测/回测结果对比说明/v0.14与v0.15回测结果差异说明.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "v0.14与v0.15回测结果差异说明"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "f6cc87c1a2ace28c",
+    "type": "split",
+    "children": [
+      {
+        "id": "4fec553e29c84ebf",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "cd6eff35919675f3",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "124564f10c1fbdd2",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "321ae632365e7c3a",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "de56c7d31af46a90",
+    "type": "split",
+    "children": [
+      {
+        "id": "47650b0f362a30b7",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "3d76c344ddf421ce",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "策略复现与回测/回测结果对比说明/v0.14与v0.15回测结果差异说明.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "v0.14与v0.15回测结果差异说明 的反向链接列表"
+            }
+          },
+          {
+            "id": "6eba69ce183b4bf8",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "策略复现与回测/回测结果对比说明/v0.14与v0.15回测结果差异说明.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "v0.14与v0.15回测结果差异说明 的出链列表"
+            }
+          },
+          {
+            "id": "d40c6f66429d5c4a",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "85ed1ab24abc3be0",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "3bfbd0d8220af31c",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "策略复现与回测/回测结果对比说明/v0.14与v0.15回测结果差异说明.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "v0.14与v0.15回测结果差异说明 的大纲"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false
+    }
+  },
+  "active": "cd6eff35919675f3",
+  "lastOpenFiles": [
+    "策略复现与回测/回测结果对比说明/v0.14与v0.15回测结果差异说明.md",
+    "策略复现与回测/回测结果对比说明/v0.13与v0.14回测结果对比说明.md",
+    "策略复现与回测/回测结果对比说明/2025年v0.13与v0.14回测结果详细对比说明.md",
+    "数据/JYDB期货数据替换/期货数据替换说明.md"
+  ]
+}
