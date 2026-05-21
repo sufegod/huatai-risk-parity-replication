@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
+BACKTEST_DIR = BASE_DIR.parent
+PROJECT_ROOT = BACKTEST_DIR.parent
 MPLCONFIG_DIR = BASE_DIR / '.matplotlib'
 MPLCONFIG_DIR.mkdir(exist_ok=True)
 os.environ.setdefault('MPLCONFIGDIR', str(MPLCONFIG_DIR))
@@ -16,12 +18,12 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # ================= 配置参数 =================
-VERSION = '0.16'
-FILE_PATH_WEIGHT_RETURNS = BASE_DIR.parent / '数据' / 'JYDB期货数据替换' / 'JYDB主力日涨跌幅_填充.csv'
-FILE_PATH_TRADE_RETURNS = BASE_DIR.parent / '数据' / 'JYDB期货数据替换' / 'JYDB主力日涨跌幅_未填充.csv'
-FILE_PATH_MOM = BASE_DIR.parent / '买方宏观预期指标合成' / '预期动量' / '增长预期动量与通胀预期动量数据.csv'
-METRICS_DIR = BASE_DIR / '回测指标'
-CHART_DIR = BASE_DIR / '回测图表'
+VERSION = '0.15_1'
+FILE_PATH_WEIGHT_RETURNS = PROJECT_ROOT / '数据' / 'JYDB期货数据替换' / 'JYDB主力日涨跌幅_填充.csv'
+FILE_PATH_TRADE_RETURNS = PROJECT_ROOT / '数据' / 'JYDB期货数据替换' / 'JYDB主力日涨跌幅_未填充.csv'
+FILE_PATH_MOM = PROJECT_ROOT / '买方宏观预期指标合成' / '预期动量' / '增长预期动量与通胀预期动量数据.csv'
+METRICS_DIR = BACKTEST_DIR / '回测指标'
+CHART_DIR = BACKTEST_DIR / '回测图表'
 MONTH_END_FREQ = 'M'
 FEE_RATE = 0.0005
 REPO_FEE_RATE = 0.000001
