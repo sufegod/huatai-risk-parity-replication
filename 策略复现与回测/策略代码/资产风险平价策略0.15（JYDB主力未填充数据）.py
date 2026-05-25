@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
+BACKTEST_DIR = BASE_DIR.parent
+PROJECT_DIR = BACKTEST_DIR.parent
 MPLCONFIG_DIR = BASE_DIR / '.matplotlib'
 MPLCONFIG_DIR.mkdir(exist_ok=True)
 os.environ.setdefault('MPLCONFIGDIR', str(MPLCONFIG_DIR))
@@ -17,11 +19,11 @@ warnings.filterwarnings('ignore')
 
 # ================= 配置参数 =================
 VERSION = '0.15'
-FILE_PATH_WEIGHT_RETURNS = BASE_DIR.parent / '数据' / 'JYDB期货数据替换' / 'JYDB主力日涨跌幅_填充.csv'
-FILE_PATH_TRADE_RETURNS = BASE_DIR.parent / '数据' / 'JYDB期货数据替换' / 'JYDB主力日涨跌幅_未填充.csv'
-FILE_PATH_MOM = BASE_DIR.parent / '买方宏观预期指标合成' / '预期动量' / '增长预期动量与通胀预期动量数据.csv'
-METRICS_DIR = BASE_DIR / '回测指标'
-CHART_DIR = BASE_DIR / '回测图表'
+FILE_PATH_WEIGHT_RETURNS = PROJECT_DIR / '数据' / 'JYDB期货数据替换' / 'JYDB主力日涨跌幅_填充.csv'
+FILE_PATH_TRADE_RETURNS = PROJECT_DIR / '数据' / 'JYDB期货数据替换' / 'JYDB主力日涨跌幅_未填充.csv'
+FILE_PATH_MOM = PROJECT_DIR / '买方宏观预期指标合成' / '预期动量' / '增长预期动量与通胀预期动量数据.csv'
+METRICS_DIR = BACKTEST_DIR / '回测指标'
+CHART_DIR = BACKTEST_DIR / '回测图表'
 MONTH_END_FREQ = 'M'
 FEE_RATE = 0.0005
 REPO_FEE_RATE = 0.000001
@@ -80,22 +82,18 @@ def get_risk_parity_weights(cov_matrix):
     return res.x / np.sum(res.x)
 
 
-def calculate_metrics(ret_series, rf_series, margin_series=None):
+def calculate_metrics(ret_series, margin_series=None):
     if len(ret_series) < 5:
         return {k: "0.00%" for k in ['年化收益', '年化波动', '夏普比率', '最大回撤', '月度胜率']}
 
     ret_series = ret_series.fillna(0)
-    rf_series = rf_series.fillna(0)
-
     nav = (1 + ret_series).cumprod()
     y = len(ret_series) / 252.0
 
     ann_ret = nav.iloc[-1] ** (1 / y) - 1 if y > 0 else 0.0
     ann_vol = ret_series.std() * np.sqrt(252)
 
-    excess_ret = ret_series - rf_series
-    ann_excess_vol = excess_ret.std() * np.sqrt(252)
-    sharpe = (excess_ret.mean() * 252) / ann_excess_vol if ann_excess_vol > 0 else 0.0
+    sharpe = (ret_series.mean() * 252) / ann_vol if ann_vol > 0 else 0.0
 
     max_dd = ((nav / nav.cummax()) - 1).min()
     monthly_ret = ret_series.resample(MONTH_END_FREQ).apply(lambda x: (1 + x).prod() - 1)
@@ -262,14 +260,13 @@ def main():
     all_metrics = []
 
     def append_metrics(period_label, start_d, end_d):
-        rf_slice = repo_net_yield.loc[start_d:end_d]
         for asset in assets:
-            m = calculate_metrics(df_trade.loc[start_d:end_d, asset], rf_slice)
+            m = calculate_metrics(df_trade.loc[start_d:end_d, asset])
             m['回测区间'] = period_label
             m['组合/资产'] = asset
             all_metrics.append(m)
         for s in strats:
-            m = calculate_metrics(ret_dfs[s].loc[start_d:end_d], rf_slice, margin_dfs[s].loc[start_d:end_d])
+            m = calculate_metrics(ret_dfs[s].loc[start_d:end_d], margin_dfs[s].loc[start_d:end_d])
             m['回测区间'] = period_label
             m['组合/资产'] = s
             all_metrics.append(m)
