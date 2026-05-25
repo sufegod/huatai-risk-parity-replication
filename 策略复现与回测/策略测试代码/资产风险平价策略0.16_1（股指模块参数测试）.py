@@ -42,8 +42,8 @@ TRAIN_END_DATE = pd.Timestamp('2020-12-31')
 VALIDATION_START_DATE = pd.Timestamp('2021-01-01')
 
 INDEX_FUTURES = ['沪深300主连', '中证1000主连']
-FIXED_BASE_WEIGHTS = [0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50]
-VOL_TARGETS = [0.12, 0.15, 0.18]
+FIXED_BASE_WEIGHTS = [0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50]
+VOL_TARGETS = [0.08, 0.10, 0.12, 0.15, 0.18, 0.20, 0.25]
 RISK_BUDGETS = [0.15, 0.20, 0.25]
 INDEX_CHANGE_LIMITS = [0.10, 0.15, 0.20]
 
@@ -583,12 +583,16 @@ def numeric_metric(df_results, scenario_name, period, column):
 def choose_dynamic_base_weights(fixed_rows):
     df_fixed = pd.DataFrame(fixed_rows)
     validation = df_fixed[df_fixed['回测区间'] == VALIDATION_PERIOD_LABEL].copy()
-    validation = validation.sort_values(
+    validation = validation[validation['基础股指仓位'] > 0]
+    eligible = validation[validation['年化收益'] >= 0.108]
+    if len(eligible) == 0:
+        eligible = validation
+    eligible = eligible.sort_values(
         ['夏普比率', '最大回撤', '年化收益'],
         ascending=[False, False, False]
     )
     selected = [0.30]
-    for _, row in validation.head(2).iterrows():
+    for _, row in eligible.head(3).iterrows():
         selected.append(float(row['基础股指仓位']))
     return sorted(set(selected))
 
