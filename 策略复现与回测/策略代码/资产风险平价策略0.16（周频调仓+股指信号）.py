@@ -21,8 +21,8 @@ warnings.filterwarnings('ignore')
 VERSION = '0.16'
 STRATEGY_NAME = '风险平价策略'
 
-FILE_PATH_WEIGHT_RETURNS = PROJECT_DIR / '数据' / 'JYDB期货数据替换' / 'JYDB主力日涨跌幅_填充.csv'
-FILE_PATH_TRADE_RETURNS = PROJECT_DIR / '数据' / 'JYDB期货数据替换' / 'JYDB主力日涨跌幅_未填充.csv'
+FILE_PATH_WEIGHT_RETURNS = PROJECT_DIR / '数据' / 'JYDB数据替换' / '日涨跌幅_填充.csv'
+FILE_PATH_TRADE_RETURNS = PROJECT_DIR / '数据' / 'JYDB数据替换' / '日涨跌幅_未填充.csv'
 FILE_PATH_INDEX_SIGNAL = PROJECT_DIR / '数据' / '原始数据' / '股指期货信号.xlsx'
 METRICS_DIR = BACKTEST_DIR / '回测指标'
 CHART_DIR = BACKTEST_DIR / '回测图表'
@@ -409,3 +409,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

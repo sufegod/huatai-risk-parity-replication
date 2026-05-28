@@ -19,8 +19,8 @@ warnings.filterwarnings('ignore')
 
 # ================= 配置参数 =================
 VERSION = '0.15'
-FILE_PATH_WEIGHT_RETURNS = PROJECT_DIR / '数据' / 'JYDB期货数据替换' / 'JYDB主力日涨跌幅_填充.csv'
-FILE_PATH_TRADE_RETURNS = PROJECT_DIR / '数据' / 'JYDB期货数据替换' / 'JYDB主力日涨跌幅_未填充.csv'
+FILE_PATH_WEIGHT_RETURNS = PROJECT_DIR / '数据' / 'JYDB数据替换' / '日涨跌幅_填充.csv'
+FILE_PATH_TRADE_RETURNS = PROJECT_DIR / '数据' / 'JYDB数据替换' / '日涨跌幅_未填充.csv'
 FILE_PATH_MOM = PROJECT_DIR / '买方宏观预期指标合成' / '预期动量' / '增长预期动量与通胀预期动量数据.csv'
 METRICS_DIR = BACKTEST_DIR / '回测指标'
 CHART_DIR = BACKTEST_DIR / '回测图表'
@@ -342,3 +342,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

@@ -1,6 +1,6 @@
-﻿-- JYDB 期货主力行情查询 SQL 模板
+-- JYDB 数据查询 SQL 模板
 -- 数据库: JYDB
--- 日期范围: 2012-11-05 至 2026-03-31; 输出按原 Excel 日期 2013-01-04 至 2026-03-31 对齐
+-- 日期范围由 update_daily_returns.py 参数化传入
 -- 注意: 实际抽取使用参数化查询；此文件不包含数据库密码。
 
 -- 金融期货: dbo.Fut_TradingQuote
@@ -9,7 +9,6 @@ SELECT
     ContractInnerCode AS 合约内部编码,
     ContractCode AS 合约代码,
     CAST(ClosePrice AS float) AS 收盘价,
-    CAST(SettlePrice AS float) AS 结算价,
     MainContractMark AS 主力标志
 FROM dbo.Fut_TradingQuote
 WHERE ExchangeCode = ?
@@ -24,7 +23,6 @@ SELECT
     q.InnerCode AS 合约内部编码,
     COALESCE(cm.ContractCode, q.ContractName, CONVERT(varchar(50), q.InnerCode)) AS 合约代码,
     CAST(q.ClosePrice AS float) AS 收盘价,
-    CAST(q.SettlePrice AS float) AS 结算价,
     q.MainContractMark AS 主力标志
 FROM dbo.Fut_DailyQuote AS q
 LEFT JOIN dbo.Fut_ContractMain AS cm
@@ -34,6 +32,16 @@ WHERE q.Exchange = ?
   AND q.EndDate BETWEEN ? AND ?
   AND q.ClosePrice IS NOT NULL
 ORDER BY q.EndDate, q.InnerCode;
+
+-- 红利低波ETF: 512890.SH / InnerCode = 201577
+SELECT
+    TradingDay AS 日期,
+    CAST(PrevClosePrice AS float) AS 前收盘价,
+    CAST(ClosePrice AS float) AS 收盘价
+FROM dbo.DZ_DailyQuote
+WHERE InnerCode = 201577
+  AND TradingDay BETWEEN ? AND ?
+ORDER BY TradingDay;
 
 -- 品种映射
 -- 资产名称,来源表,交易所代码,品种代码,品种前缀,说明
@@ -47,3 +55,7 @@ ORDER BY q.EndDate, q.InnerCode;
 沪铝主连,dbo.Fut_DailyQuote,10,310,AL,上海铝期货
 PTA主连,dbo.Fut_DailyQuote,15,322,TA,郑商所PTA期货
 原油主连,dbo.Fut_DailyQuote,11,319,SC,上海原油期货
+红利低波ETF,dbo.DZ_DailyQuote,,,512890.SH,华泰柏瑞中证红利低波动ETF
+
+-- 一天期国债逆回购不使用 JYDB 的 204001.SH 开高低收字段。
+-- 使用 iFinD MCP get_edb_data 查询 L004369613 / GC001(加权平均)，单位 %。
