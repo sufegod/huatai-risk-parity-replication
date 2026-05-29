@@ -1,8 +1,11 @@
 import importlib.util
 import json
+import os
+import shutil
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -20,6 +23,118 @@ def load_module():
 
 
 class UpdateDailyReturnsTests(unittest.TestCase):
+    def workspace_temp_dir(self, name: str) -> Path:
+        root = PROJECT_ROOT / ".test_update_daily_returns"
+        temp_dir = root / name
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
+        temp_dir.mkdir(parents=True)
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        return temp_dir
+
+    def test_load_env_file_parses_simple_key_values(self):
+        module = load_module()
+        env_path = self.workspace_temp_dir("env_parse") / ".env"
+        env_path.write_text(
+            "\n".join(
+                [
+                    "# local secrets",
+                    "JYDB_SERVER=192.168.10.48",
+                    "JYDB_UID=tsreadonly",
+                    "IFIND_MCP_URL=\"https://ifind.example/mcp\"",
+                    "IFIND_MCP_AUTHORIZATION='Bearer test-token'",
+                    "EMPTY_VALUE=",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        with patch.dict(os.environ, {}, clear=True):
+            module.load_env_file(env_path)
+
+            self.assertEqual(os.environ["JYDB_SERVER"], "192.168.10.48")
+            self.assertEqual(os.environ["JYDB_UID"], "tsreadonly")
+            self.assertEqual(os.environ["IFIND_MCP_URL"], "https://ifind.example/mcp")
+            self.assertEqual(os.environ["IFIND_MCP_AUTHORIZATION"], "Bearer test-token")
+            self.assertEqual(os.environ["EMPTY_VALUE"], "")
+
+    def test_load_env_file_does_not_override_existing_environment(self):
+        module = load_module()
+        env_path = self.workspace_temp_dir("env_no_override") / ".env"
+        env_path.write_text(
+            "\n".join(
+                [
+                    "JYDB_PWD=file-password",
+                    "JYDB_SERVER=file-server",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        with patch.dict(os.environ, {"JYDB_PWD": "existing-password"}, clear=True):
+            module.load_env_file(env_path)
+
+            self.assertEqual(os.environ["JYDB_PWD"], "existing-password")
+            self.assertEqual(os.environ["JYDB_SERVER"], "file-server")
+
+    def test_read_ifind_mcp_config_prefers_environment_without_toml(self):
+        module = load_module()
+
+        with patch.dict(
+            os.environ,
+            {
+                "IFIND_MCP_URL": "https://ifind.example/mcp",
+                "IFIND_MCP_AUTHORIZATION": "Bearer env-token",
+            },
+            clear=True,
+        ):
+            url, headers = module.read_ifind_mcp_config(Path("does-not-exist.toml"))
+
+        self.assertEqual(url, "https://ifind.example/mcp")
+        self.assertEqual(headers["Authorization"], "Bearer env-token")
+        self.assertEqual(headers["Content-Type"], "application/json")
+        self.assertEqual(headers["Accept"], "application/json, text/event-stream")
+
+    def test_read_ifind_mcp_config_falls_back_to_toml_when_env_missing(self):
+        module = load_module()
+        config_path = self.workspace_temp_dir("ifind_toml") / "config.toml"
+        config_path.write_text(
+            "\n".join(
+                [
+                    "[mcp_servers.hexin-ifind-ds-edb-mcp]",
+                    'url = "https://ifind.example/toml"',
+                    "[mcp_servers.hexin-ifind-ds-edb-mcp.http_headers]",
+                    'Authorization = "Bearer toml-token"',
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        with patch.dict(os.environ, {}, clear=True):
+            url, headers = module.read_ifind_mcp_config(config_path)
+
+        self.assertEqual(url, "https://ifind.example/toml")
+        self.assertEqual(headers["Authorization"], "Bearer toml-token")
+
+    def test_main_loads_project_env_before_connecting_to_jydb(self):
+        module = load_module()
+        env_path = self.workspace_temp_dir("main_env") / ".env"
+        env_path.write_text("JYDB_PWD=file-password\n", encoding="utf-8")
+        legacy_frame = pd.DataFrame(index=pd.to_datetime(["2026-05-28"]))
+
+        with (
+            patch.object(module, "ENV_FILE", env_path, create=True),
+            patch.object(module, "find_existing_file", return_value=Path("returns.csv")),
+            patch.object(module, "read_returns_csv", return_value=legacy_frame),
+            patch.object(module, "connect_jydb", side_effect=RuntimeError("stop after env load")),
+            patch.dict(os.environ, {"USERPROFILE": str(PROJECT_ROOT)}, clear=True),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "stop after env load"):
+                module.main(["--end-date", "2026-05-28"])
+
+            self.assertEqual(os.environ["JYDB_PWD"], "file-password")
+
     def test_prune_output_columns_removes_unused_assets_and_preserves_order(self):
         module = load_module()
         df = pd.DataFrame(

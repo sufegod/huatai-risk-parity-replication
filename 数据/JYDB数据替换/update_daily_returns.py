@@ -18,6 +18,7 @@ import pandas as pd
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parents[1]
 LEGACY_DIR = PROJECT_ROOT / "数据" / "JYDB数据替换"
+ENV_FILE = PROJECT_ROOT / ".env"
 
 OUTPUT_FILLED = "日涨跌幅_填充.csv"
 OUTPUT_UNFILLED = "日涨跌幅_未填充.csv"
@@ -28,6 +29,8 @@ SUMMARY_FILE = "日涨跌幅更新摘要.md"
 
 UNUSED_COLUMNS = {"有色ETF", "能源化工ETF", "布油连续"}
 IFIND_SERVER_NAME = "hexin-ifind-ds-edb-mcp"
+IFIND_MCP_URL_ENV = "IFIND_MCP_URL"
+IFIND_MCP_AUTH_ENV = "IFIND_MCP_AUTHORIZATION"
 IFIND_GC001_INDEX_ID = "L004369613"
 IFIND_GC001_FIELD = "GC001(加权平均)"
 REPO_COLUMN = "一天期国债逆回购"
@@ -74,6 +77,35 @@ OUTPUT_COLUMNS = [
 
 class AdjustmentError(RuntimeError):
     pass
+
+
+def _strip_env_value(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def load_env_file(path: Path) -> None:
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :].strip()
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key or key in os.environ:
+            continue
+        os.environ[key] = _strip_env_value(value)
+
+
+def load_project_env() -> None:
+    load_env_file(ENV_FILE)
 
 
 def prune_output_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -337,7 +369,20 @@ ORDER BY TradingDay
     return compute_return_from_prev_close(df)
 
 
+def _ifind_headers(authorization: str) -> dict[str, str]:
+    return {
+        "Authorization": authorization,
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+    }
+
+
 def read_ifind_mcp_config(config_path: Path, server_name: str = IFIND_SERVER_NAME) -> tuple[str, dict[str, str]]:
+    env_url = os.environ.get(IFIND_MCP_URL_ENV)
+    env_authorization = os.environ.get(IFIND_MCP_AUTH_ENV)
+    if env_url and env_authorization:
+        return env_url, _ifind_headers(env_authorization)
+
     with config_path.open("rb") as file:
         config = tomllib.load(file)
     server = config["mcp_servers"][server_name]
@@ -547,6 +592,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
+    load_project_env()
     legacy_filled_path = find_existing_file(OUTPUT_FILLED, LEGACY_FILLED)
     legacy_filled = read_returns_csv(legacy_filled_path)
     start_date = pd.Timestamp(args.start_date).normalize() if args.start_date else legacy_filled.index.min().normalize()

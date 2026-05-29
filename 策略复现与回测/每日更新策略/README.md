@@ -4,6 +4,34 @@
 
 ## 运行方式
 
+先在仓库根目录准备 Python 环境：
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+```
+
+如需更新最新数据，先准备本地敏感配置：
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+git check-ignore -v .env
+```
+
+`.env` 会由 `数据/JYDB数据替换/update_daily_returns.py` 自动读取，不会提交到 GitHub。需要填写：
+
+- `JYDB_DRIVER`：SQL Server ODBC 驱动名，默认 `ODBC Driver 17 for SQL Server`。
+- `JYDB_SERVER`：JYDB SQL Server 地址。
+- `JYDB_DATABASE`：数据库名，默认 `JYDB`。
+- `JYDB_UID`：数据库用户名。
+- `JYDB_PWD`：数据库密码。
+- `IFIND_MCP_URL`：iFinD MCP 地址。
+- `IFIND_MCP_AUTHORIZATION`：iFinD MCP 的完整 `Authorization` 值。
+
+脚本会优先使用 `.env` / 当前环境变量中的 iFinD 配置；若缺失，则回退到 `--ifind-config` 指定的 TOML，默认 `~/.codex/config.toml`。
+
 默认运行：
 
 ```powershell
@@ -27,6 +55,20 @@ python 策略复现与回测\每日更新策略\daily_update_strategy.py --data-
 ```powershell
 python 策略复现与回测\每日更新策略\daily_update_strategy.py --skip-data-update
 ```
+
+单独测试数据更新链路：
+
+```powershell
+python 数据\JYDB数据替换\update_daily_returns.py --end-date 2026-05-28 --dry-run
+```
+
+覆盖输出前备份旧文件：
+
+```powershell
+python 数据\JYDB数据替换\update_daily_returns.py --end-date 2026-05-28 --backup
+```
+
+不要把真实数据库密码、iFinD token、Authorization 写入 README、提交信息、issue、PR 或日志。`.env` 只用于线下分发和本地运行。
 
 ## 输入与输出
 
