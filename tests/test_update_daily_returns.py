@@ -202,6 +202,228 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         self.assertEqual(list(result.index.strftime("%Y-%m-%d")), ["2013-01-04", "2013-01-07"])
         self.assertEqual(result.loc[pd.Timestamp("2013-01-04")], 5.256)
 
+    def test_merge_cache_frames_replaces_overlap_and_sorts(self):
+        module = load_module()
+        existing = pd.DataFrame(
+            [
+                ["沪深300主连", "financial", "2026-05-29", 1002, "IF2606", 4010.0, 1],
+                ["沪深300主连", "financial", "2026-05-28", 1001, "IF2606", 4000.0, 1],
+            ],
+            columns=["资产", "来源", "日期", "合约内部编码", "合约代码", "收盘价", "主力标志"],
+        )
+        incoming = pd.DataFrame(
+            [
+                ["沪深300主连", "financial", "2026-05-30", 1002, "IF2606", 4020.0, 1],
+                ["沪深300主连", "financial", "2026-05-29", 1002, "IF2606", 4011.0, 1],
+            ],
+            columns=existing.columns,
+        )
+
+        result = module.merge_cache_frames(
+            existing,
+            incoming,
+            key_columns=["资产", "日期", "合约内部编码"],
+            sort_columns=["资产", "日期", "合约内部编码"],
+        )
+
+        self.assertEqual(list(result["日期"].dt.strftime("%Y-%m-%d")), ["2026-05-28", "2026-05-29", "2026-05-30"])
+        self.assertEqual(result.loc[result["日期"] == pd.Timestamp("2026-05-29"), "收盘价"].iloc[0], 4011.0)
+        self.assertEqual(len(result), 3)
+
+    def test_incremental_fetch_start_uses_cache_max_minus_overlap(self):
+        module = load_module()
+        cache = pd.DataFrame({"日期": pd.to_datetime(["2026-05-28", "2026-05-29"])})
+
+        result = module.calculate_incremental_start(
+            cache,
+            fallback_start=pd.Timestamp("2013-01-04"),
+            overlap_days=7,
+            full_refresh=False,
+        )
+
+        self.assertEqual(result, pd.Timestamp("2026-05-22"))
+
+    def test_incremental_fetch_start_uses_fallback_for_empty_or_full_refresh(self):
+        module = load_module()
+        cache = pd.DataFrame({"日期": pd.to_datetime(["2026-05-29"])})
+
+        empty_result = module.calculate_incremental_start(
+            pd.DataFrame(columns=["日期"]),
+            fallback_start=pd.Timestamp("2013-01-04"),
+            overlap_days=7,
+            full_refresh=False,
+        )
+        refresh_result = module.calculate_incremental_start(
+            cache,
+            fallback_start=pd.Timestamp("2013-01-04"),
+            overlap_days=7,
+            full_refresh=True,
+        )
+
+        self.assertEqual(empty_result, pd.Timestamp("2013-01-04"))
+        self.assertEqual(refresh_result, pd.Timestamp("2013-01-04"))
+
+    def test_build_futures_outputs_from_cache_matches_adjusted_price_algorithm(self):
+        module = load_module()
+        cached_quotes = pd.DataFrame(
+            [
+                ["沪深300主连", "financial", "2026-05-27", 1, "IFOLD", 100.0, 1],
+                ["沪深300主连", "financial", "2026-05-28", 1, "IFOLD", 110.0, 1],
+                ["沪深300主连", "financial", "2026-05-28", 2, "IFNEW", 220.0, 0],
+                ["沪深300主连", "financial", "2026-05-29", 1, "IFOLD", 120.0, 0],
+                ["沪深300主连", "financial", "2026-05-29", 2, "IFNEW", 240.0, 1],
+            ],
+            columns=["资产", "来源", "日期", "合约内部编码", "合约代码", "收盘价", "主力标志"],
+        )
+
+        returns, prices, summary = module.build_futures_outputs_from_cache(
+            cached_quotes,
+            start_date=pd.Timestamp("2026-05-27"),
+            end_date=pd.Timestamp("2026-05-29"),
+            lookback_days=0,
+        )
+
+        self.assertAlmostEqual(prices.loc[pd.Timestamp("2026-05-27"), "沪深300主连"], 200.0)
+        self.assertAlmostEqual(prices.loc[pd.Timestamp("2026-05-28"), "沪深300主连"], 220.0)
+        self.assertAlmostEqual(prices.loc[pd.Timestamp("2026-05-29"), "沪深300主连"], 240.0)
+        self.assertAlmostEqual(returns.loc[pd.Timestamp("2026-05-29"), "沪深300主连"], (240.0 / 220.0 - 1.0) * 100.0)
+        self.assertEqual(summary[0]["行情行数"], 5)
+
+    def test_main_rebuild_from_cache_does_not_call_external_sources(self):
+        module = load_module()
+        legacy_frame = pd.DataFrame(index=pd.to_datetime(["2026-05-27", "2026-05-28", "2026-05-29"]))
+        futures_cache = pd.DataFrame(
+            [
+                ["沪深300主连", "financial", "2026-05-27", 1, "IF2606", 4000.0, 1],
+                ["沪深300主连", "financial", "2026-05-28", 1, "IF2606", 4010.0, 1],
+                ["沪深300主连", "financial", "2026-05-29", 1, "IF2606", 4020.0, 1],
+            ],
+            columns=["资产", "来源", "日期", "合约内部编码", "合约代码", "收盘价", "主力标志"],
+        )
+        etf_cache = pd.DataFrame(
+            {
+                "日期": pd.to_datetime(["2026-05-27", "2026-05-28", "2026-05-29"]),
+                "PrevClosePrice": [1.0, 1.0, 1.0],
+                "ClosePrice": [1.0, 1.01, 1.02],
+            }
+        )
+        gc001_cache = pd.DataFrame(
+            {
+                "日期": pd.to_datetime(["2026-05-27", "2026-05-28", "2026-05-29"]),
+                "一天期国债逆回购": [1.5, 1.6, 1.7],
+            }
+        )
+        written = {"returns": 0, "prices": 0, "summary": 0}
+
+        def count_returns(*args, **kwargs):
+            written["returns"] += 1
+
+        def count_prices(*args, **kwargs):
+            written["prices"] += 1
+
+        def count_summary(*args, **kwargs):
+            written["summary"] += 1
+
+        with (
+            patch.object(module, "load_project_env"),
+            patch.object(module, "find_existing_file", return_value=Path("returns.csv")),
+            patch.object(module, "read_returns_csv", return_value=legacy_frame),
+            patch.object(module, "read_futures_quote_cache", return_value=futures_cache),
+            patch.object(module, "read_etf_quote_cache", return_value=etf_cache),
+            patch.object(module, "read_gc001_cache", return_value=gc001_cache),
+            patch.object(module, "connect_jydb", side_effect=AssertionError("JYDB should not be used")),
+            patch.object(module, "fetch_gc001_weighted_average", side_effect=AssertionError("iFinD should not be used")),
+            patch.object(module, "write_returns_csv", side_effect=count_returns),
+            patch.object(module, "write_price_csv", side_effect=count_prices),
+            patch.object(module, "write_summary", side_effect=count_summary),
+        ):
+            exit_code = module.main(["--rebuild-from-cache", "--end-date", "2026-05-29"])
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(written, {"returns": 2, "prices": 1, "summary": 1})
+
+    def test_write_cache_csv_dry_run_does_not_create_file(self):
+        module = load_module()
+        target = self.workspace_temp_dir("cache_dry_run") / "cache.csv"
+        df = pd.DataFrame({"日期": pd.to_datetime(["2026-05-29"]), "值": [1.0]})
+
+        module.write_cache_csv(df, target, columns=["日期", "值"], dry_run=True)
+
+        self.assertFalse(target.exists())
+
+    def test_refresh_futures_quote_cache_skips_when_target_not_newer_than_cache(self):
+        module = load_module()
+        existing = pd.DataFrame(
+            [
+                ["沪深300主连", "financial", "2026-05-29", 1002, "IF2606", 4010.0, 1],
+            ],
+            columns=["资产", "来源", "日期", "合约内部编码", "合约代码", "收盘价", "主力标志"],
+        )
+
+        with (
+            patch.object(module, "fetch_futures_cache_rows", side_effect=AssertionError("should not fetch")),
+            patch.object(module, "write_cache_csv", side_effect=AssertionError("should not write")),
+        ):
+            result, stat = module.refresh_futures_quote_cache(
+                conn=object(),
+                existing=existing,
+                fallback_start=pd.Timestamp("2013-01-04"),
+                target_end=pd.Timestamp("2026-05-29"),
+                overlap_days=7,
+                full_refresh=False,
+                dry_run=False,
+            )
+
+        self.assertEqual(len(result), 1)
+        self.assertTrue(stat.skipped)
+        self.assertEqual(stat.previous_end, "2026-05-29")
+
+    def test_refresh_futures_quote_cache_initializes_empty_cache_and_writes_result(self):
+        module = load_module()
+        incoming = pd.DataFrame(
+            [
+                ["沪深300主连", "financial", "2013-01-04", 1001, "IF1301", 2500.0, 1],
+            ],
+            columns=["资产", "来源", "日期", "合约内部编码", "合约代码", "收盘价", "主力标志"],
+        )
+        captured = {}
+
+        def capture_write(df, path, columns, dry_run):
+            captured["rows"] = len(df)
+            captured["path_name"] = path.name
+            captured["columns"] = columns
+            captured["dry_run"] = dry_run
+
+        with (
+            patch.object(module, "fetch_futures_cache_rows", return_value=incoming) as fetch_mock,
+            patch.object(module, "write_cache_csv", side_effect=capture_write),
+        ):
+            result, stat = module.refresh_futures_quote_cache(
+                conn=object(),
+                existing=pd.DataFrame(columns=["日期"]),
+                fallback_start=pd.Timestamp("2013-01-04"),
+                target_end=pd.Timestamp("2013-01-04"),
+                overlap_days=7,
+                full_refresh=False,
+                dry_run=False,
+            )
+
+        fetch_mock.assert_called_once()
+        self.assertEqual(fetch_mock.call_args.args[1], pd.Timestamp("2013-01-04"))
+        self.assertEqual(fetch_mock.call_args.args[2], pd.Timestamp("2013-01-04"))
+        self.assertEqual(len(result), 1)
+        self.assertEqual(stat.fetched_rows, 1)
+        self.assertEqual(captured["rows"], 1)
+        self.assertEqual(captured["path_name"], "期货行情.csv")
+        self.assertEqual(captured["columns"], module.FUTURES_CACHE_COLUMNS)
+        self.assertFalse(captured["dry_run"])
+
+    def test_parse_args_no_longer_accepts_backup(self):
+        module = load_module()
+
+        with self.assertRaises(SystemExit):
+            module.parse_args(["--backup"])
+
 
 if __name__ == "__main__":
     unittest.main()

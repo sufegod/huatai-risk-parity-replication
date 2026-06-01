@@ -71,7 +71,6 @@ def load_v016_module(script_path: Path = V016_SCRIPT):
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="先更新日度数据，再生成v0.16每日策略仓位报告")
     parser.add_argument("--data-end-date", help="传递给每日数据更新脚本的结束日期")
-    parser.add_argument("--data-backup", action="store_true", help="运行数据更新时备份被覆盖的数据文件")
     parser.add_argument("--skip-data-update", action="store_true", help="跳过每日数据更新，仅基于现有CSV生成报告")
     parser.add_argument("--force-observation", action="store_true", help="强制将策略数据日期作为周度观察日")
     return parser.parse_args(argv)
@@ -79,22 +78,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def run_data_update(
     data_end_date: str | None = None,
-    backup: bool = False,
     runner: Runner = subprocess.run,
     python_executable: str = sys.executable,
 ) -> subprocess.CompletedProcess:
     cmd = [python_executable, str(DATA_UPDATE_SCRIPT)]
     if data_end_date:
         cmd.extend(["--end-date", data_end_date])
-    if backup:
-        cmd.append("--backup")
     return runner(cmd, cwd=PROJECT_ROOT, check=True)
 
 
 def maybe_run_data_update(args: argparse.Namespace, runner: Runner = subprocess.run) -> str:
     if args.skip_data_update:
         return "skipped"
-    run_data_update(args.data_end_date, args.data_backup, runner=runner)
+    run_data_update(args.data_end_date, runner=runner)
     return "updated"
 
 

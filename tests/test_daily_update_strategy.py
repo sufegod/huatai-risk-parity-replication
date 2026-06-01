@@ -22,7 +22,7 @@ def load_module():
 
 
 class DailyUpdateStrategyTests(unittest.TestCase):
-    def test_run_data_update_passes_end_date_and_backup_to_update_script(self):
+    def test_run_data_update_passes_end_date_to_update_script(self):
         module = load_module()
         calls = []
 
@@ -32,7 +32,6 @@ class DailyUpdateStrategyTests(unittest.TestCase):
 
         module.run_data_update(
             data_end_date="2026-05-28",
-            backup=True,
             runner=fake_runner,
             python_executable="python",
         )
@@ -41,11 +40,16 @@ class DailyUpdateStrategyTests(unittest.TestCase):
         cmd, kwargs = calls[0]
         self.assertEqual(cmd[0], "python")
         self.assertEqual(Path(cmd[1]).name, "update_daily_returns.py")
-        self.assertIn("--end-date", cmd)
-        self.assertIn("2026-05-28", cmd)
-        self.assertIn("--backup", cmd)
+        self.assertEqual(cmd[2:], ["--end-date", "2026-05-28"])
+        self.assertNotIn("--backup", cmd)
         self.assertEqual(Path(kwargs["cwd"]), PROJECT_ROOT)
         self.assertTrue(kwargs["check"])
+
+    def test_parse_args_no_longer_accepts_data_backup(self):
+        module = load_module()
+
+        with self.assertRaises(SystemExit):
+            module.parse_args(["--data-backup"])
 
     def test_run_stops_when_data_update_fails(self):
         module = load_module()
@@ -58,7 +62,7 @@ class DailyUpdateStrategyTests(unittest.TestCase):
 
     def test_maybe_run_data_update_skips_runner_when_requested(self):
         module = load_module()
-        args = Namespace(skip_data_update=True, data_end_date=None, data_backup=False)
+        args = Namespace(skip_data_update=True, data_end_date=None)
 
         def unexpected_runner(cmd, **kwargs):
             raise AssertionError("runner should not be called")
