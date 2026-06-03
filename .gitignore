@@ -12,6 +12,7 @@ __pycache__/
 .venv/
 venv/
 .env
+.test_update_daily_returns/
 
 # Notebook checkpoints
 .ipynb_checkpoints/
@@ -24,3 +25,10 @@ Code Cache/
 DawnCache/
 ShaderCache/
 **/.matplotlib/
+
+# Local workspace state
+.obsidian/workspace.json
+
+# Generated outputs and mutable caches
+策略复现与回测/每日更新策略/输出/
+数据/日度收益数据更新/增量缓存/*.csv

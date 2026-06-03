@@ -2,13 +2,18 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from pathlib import Path
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+DATA_FILE = SCRIPT_DIR.parent / '代理资产行情.xlsx'
 
 # 解决图表中的中文显示问题
 mpl.rcParams['font.sans-serif'] = ['SimHei', 'WenQuanYi Micro Hei', 'DejaVu Sans']
 mpl.rcParams['axes.unicode_minus'] = False
 
 # 1. 读取 Excel 文件中指定的 "生产端通胀代理资产" sheet
-df = pd.read_excel('代理资产行情.xlsx', sheet_name='生产端通胀代理资产', index_col=0, parse_dates=True)
+df = pd.read_excel(DATA_FILE, sheet_name='生产端通胀代理资产', index_col=0, parse_dates=True)
 df.index.name = 'Date'
 
 # 选择所需的代理资产列
@@ -64,7 +69,7 @@ if not result_2014.empty:
 
 # --- 按照要求修改为中文命名 ---
 # 将结果保存为 CSV 文件
-csv_filename = '生产端通胀因子组合净值数据.csv'
+csv_filename = SCRIPT_DIR / '生产端通胀因子组合净值数据.csv'
 result_2014.to_csv(csv_filename)
 print(f"数据处理完毕，已保存至 {csv_filename}")
 
@@ -77,7 +82,7 @@ plt.ylabel('净值 (2014年基准=1)')
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('生产端通胀因子组合净值走势图.png')
+plt.savefig(SCRIPT_DIR / '生产端通胀因子组合净值走势图.png')
 plt.close()
 
 # 2. 生产端通胀因子组合净值同比走势图
@@ -90,5 +95,5 @@ plt.ylabel('同比收益率')
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('生产端通胀因子组合净值同比走势图.png')
+plt.savefig(SCRIPT_DIR / '生产端通胀因子组合净值同比走势图.png')
 plt.close()

@@ -2,6 +2,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from pathlib import Path
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+MACRO_DIR = SCRIPT_DIR.parent
 
 # 解决图表中的中文显示问题
 mpl.rcParams['font.sans-serif'] = ['SimHei', 'WenQuanYi Micro Hei', 'DejaVu Sans']
@@ -24,8 +29,8 @@ def calc_displacement_path_momentum(series, n):
 
 # 2. 读取之前生成的因子净值数据
 try:
-    df_growth = pd.read_csv('../增长高频因子/增长因子组合净值数据.csv', index_col=0, parse_dates=True)
-    df_inflation = pd.read_csv('../生产端通胀高频因子/生产端通胀因子组合净值数据.csv', index_col=0, parse_dates=True)
+    df_growth = pd.read_csv(MACRO_DIR / '增长高频因子' / '增长因子组合净值数据.csv', index_col=0, parse_dates=True)
+    df_inflation = pd.read_csv(MACRO_DIR / '生产端通胀高频因子' / '生产端通胀因子组合净值数据.csv', index_col=0, parse_dates=True)
 except FileNotFoundError as e:
     print("错误: 未找到因子净值文件，请确保您已执行前两段代码并在同目录下生成了相关的 CSV 文件。")
     raise e
@@ -44,7 +49,7 @@ momentum_df = pd.DataFrame({
 }).dropna()  # 剔除由于计算滚动窗口产生的初始空值
 
 # 5. 保存数据到 CSV
-csv_filename = '增长预期动量与通胀预期动量数据.csv'
+csv_filename = SCRIPT_DIR / '增长预期动量与通胀预期动量数据.csv'
 momentum_df.to_csv(csv_filename)
 print(f"数据处理完毕，动量指标已保存至 {csv_filename}")
 
@@ -62,7 +67,7 @@ plt.ylabel('动量值 [-1, 1]')
 plt.legend()
 plt.grid(True, linestyle=':', alpha=0.6)
 plt.tight_layout()
-plt.savefig('增长预期动量走势图.png')
+plt.savefig(SCRIPT_DIR / '增长预期动量走势图.png')
 plt.close()
 print("图表已保存: 增长预期动量走势图.png")
 
@@ -78,6 +83,6 @@ plt.ylabel('动量值 [-1, 1]')
 plt.legend()
 plt.grid(True, linestyle=':', alpha=0.6)
 plt.tight_layout()
-plt.savefig('通胀预期动量走势图.png')
+plt.savefig(SCRIPT_DIR / '通胀预期动量走势图.png')
 plt.close()
 print("图表已保存: 通胀预期动量走势图.png")

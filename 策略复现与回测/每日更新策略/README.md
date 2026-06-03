@@ -27,30 +27,31 @@ git check-ignore -v .env
 - `JYDB_DATABASE`：数据库名，默认 `JYDB`。
 - `JYDB_UID`：数据库用户名。
 - `JYDB_PWD`：数据库密码。
-- `IFIND_MCP_URL`：iFinD MCP 地址。
-- `IFIND_MCP_AUTHORIZATION`：iFinD MCP 的完整 `Authorization` 值。
-
-脚本会优先使用 `.env` / 当前环境变量中的 iFinD 配置；若缺失，则回退到 `--ifind-config` 指定的 TOML，默认 `~/.codex/config.toml`。
-
 默认运行：
 
 ```powershell
-python 策略复现与回测\每日更新策略\daily_update_strategy.py
+python -m risk_parity.daily_update
 ```
 
 指定数据更新截止日：
 
 ```powershell
-python 策略复现与回测\每日更新策略\daily_update_strategy.py --data-end-date 2026-05-28
+python -m risk_parity.daily_update --data-end-date 2026-05-28
 ```
 
 短周或节假日前需要把当前数据日视为周度观察日时：
 
 ```powershell
-python 策略复现与回测\每日更新策略\daily_update_strategy.py --data-end-date 2026-05-28 --force-observation
+python -m risk_parity.daily_update --data-end-date 2026-05-28 --force-observation
 ```
 
 仅基于现有 CSV 调试：
+
+```powershell
+python -m risk_parity.daily_update --skip-data-update
+```
+
+兼容旧入口仍可使用：
 
 ```powershell
 python 策略复现与回测\每日更新策略\daily_update_strategy.py --skip-data-update
@@ -62,7 +63,7 @@ python 策略复现与回测\每日更新策略\daily_update_strategy.py --skip-
 python 数据\日度收益数据更新\日度收益数据更新.py --end-date 2026-05-28 --dry-run
 ```
 
-不要把真实数据库密码、iFinD token、Authorization 写入 README、提交信息、issue、PR 或日志。`.env` 只用于线下分发和本地运行。
+不要把真实数据库密码写入 README、提交信息、issue、PR 或日志。`.env` 只用于线下分发和本地运行。
 
 ## 输入与输出
 

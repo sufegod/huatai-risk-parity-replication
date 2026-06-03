@@ -1,4 +1,3 @@
-import importlib.util
 import os
 import shutil
 from pathlib import Path
@@ -10,15 +9,10 @@ import pandas as pd
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SCRIPT_PATH = PROJECT_ROOT / "数据" / "日度收益数据更新" / "日度收益数据更新.py"
+SOURCE_DIR = PROJECT_ROOT / "源码"
+sys.path.insert(0, str(SOURCE_DIR))
 
-
-def load_module():
-    spec = importlib.util.spec_from_file_location("update_daily_returns", SCRIPT_PATH)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+from risk_parity import daily_returns_update as module
 
 
 class UpdateDailyReturnsTests(unittest.TestCase):
@@ -32,7 +26,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         return temp_dir
 
     def test_load_env_file_parses_simple_key_values(self):
-        module = load_module()
         env_path = self.workspace_temp_dir("env_parse") / ".env"
         env_path.write_text(
             "\n".join(
@@ -57,7 +50,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
             self.assertEqual(os.environ["EMPTY_VALUE"], "")
 
     def test_load_env_file_does_not_override_existing_environment(self):
-        module = load_module()
         env_path = self.workspace_temp_dir("env_no_override") / ".env"
         env_path.write_text(
             "\n".join(
@@ -76,7 +68,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
             self.assertEqual(os.environ["JYDB_SERVER"], "file-server")
 
     def test_main_loads_project_env_before_connecting_to_jydb(self):
-        module = load_module()
         env_path = self.workspace_temp_dir("main_env") / ".env"
         env_path.write_text("JYDB_PWD=file-password\n", encoding="utf-8")
         legacy_frame = pd.DataFrame(index=pd.to_datetime(["2026-05-28"]))
@@ -94,7 +85,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
             self.assertEqual(os.environ["JYDB_PWD"], "file-password")
 
     def test_prune_output_columns_removes_unused_assets_and_preserves_order(self):
-        module = load_module()
         df = pd.DataFrame(
             {
                 "日期": ["2026-03-31"],
@@ -116,7 +106,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         )
 
     def test_compute_etf_return_uses_prev_close_on_adjustment_day(self):
-        module = load_module()
         quotes = pd.DataFrame(
             {
                 "日期": pd.to_datetime(["2021-10-22", "2021-10-25"]),
@@ -132,7 +121,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         self.assertLess(raw_close_return, -49.0)
 
     def test_merge_cache_frames_replaces_overlap_and_sorts(self):
-        module = load_module()
         existing = pd.DataFrame(
             [
                 ["沪深300主连", "financial", "2026-05-29", 1002, "IF2606", 4010.0, 1],
@@ -160,7 +148,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         self.assertEqual(len(result), 3)
 
     def test_incremental_fetch_start_uses_cache_max_minus_overlap(self):
-        module = load_module()
         cache = pd.DataFrame({"日期": pd.to_datetime(["2026-05-28", "2026-05-29"])})
 
         result = module.calculate_incremental_start(
@@ -173,7 +160,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         self.assertEqual(result, pd.Timestamp("2026-05-22"))
 
     def test_incremental_fetch_start_uses_fallback_for_empty_or_full_refresh(self):
-        module = load_module()
         cache = pd.DataFrame({"日期": pd.to_datetime(["2026-05-29"])})
 
         empty_result = module.calculate_incremental_start(
@@ -193,7 +179,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         self.assertEqual(refresh_result, pd.Timestamp("2013-01-04"))
 
     def test_build_futures_outputs_from_cache_matches_adjusted_price_algorithm(self):
-        module = load_module()
         cached_quotes = pd.DataFrame(
             [
                 ["沪深300主连", "financial", "2026-05-27", 1, "IFOLD", 100.0, 1],
@@ -219,7 +204,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         self.assertEqual(summary[0]["行情行数"], 5)
 
     def test_main_rebuild_from_cache_does_not_call_external_sources(self):
-        module = load_module()
         legacy_frame = pd.DataFrame(index=pd.to_datetime(["2026-05-27", "2026-05-28", "2026-05-29"]))
         futures_cache = pd.DataFrame(
             [
@@ -271,7 +255,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         self.assertEqual(written, {"returns": 2, "prices": 1, "summary": 1})
 
     def test_fetch_gc001_quote_rows_queries_ftdb_ths_gc(self):
-        module = load_module()
         captured = {}
 
         def fake_fetch_dataframe(conn, sql, params):
@@ -303,7 +286,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         self.assertEqual(result["一天期国债逆回购"].tolist(), [1.324, 1.084])
 
     def test_refresh_gc001_cache_fetches_from_ftdb_and_replaces_overlap(self):
-        module = load_module()
         existing = pd.DataFrame(
             {
                 "日期": pd.to_datetime(["2026-05-28", "2026-05-29"]),
@@ -352,13 +334,10 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         self.assertFalse(captured["dry_run"])
 
     def test_parse_args_no_longer_accepts_ifind_config(self):
-        module = load_module()
-
         with self.assertRaises(SystemExit):
             module.parse_args(["--ifind-config", "config.toml"])
 
     def test_write_cache_csv_dry_run_does_not_create_file(self):
-        module = load_module()
         target = self.workspace_temp_dir("cache_dry_run") / "cache.csv"
         df = pd.DataFrame({"日期": pd.to_datetime(["2026-05-29"]), "值": [1.0]})
 
@@ -367,7 +346,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         self.assertFalse(target.exists())
 
     def test_refresh_futures_quote_cache_skips_when_target_not_newer_than_cache(self):
-        module = load_module()
         existing = pd.DataFrame(
             [
                 ["沪深300主连", "financial", "2026-05-29", 1002, "IF2606", 4010.0, 1],
@@ -394,7 +372,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         self.assertEqual(stat.previous_end, "2026-05-29")
 
     def test_refresh_futures_quote_cache_initializes_empty_cache_and_writes_result(self):
-        module = load_module()
         incoming = pd.DataFrame(
             [
                 ["沪深300主连", "financial", "2013-01-04", 1001, "IF1301", 2500.0, 1],
@@ -434,8 +411,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         self.assertFalse(captured["dry_run"])
 
     def test_parse_args_no_longer_accepts_backup(self):
-        module = load_module()
-
         with self.assertRaises(SystemExit):
             module.parse_args(["--backup"])
 

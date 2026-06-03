@@ -1,4 +1,3 @@
-import importlib.util
 import subprocess
 import sys
 import unittest
@@ -10,20 +9,14 @@ import pandas as pd
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SCRIPT_PATH = PROJECT_ROOT / "策略复现与回测" / "每日更新策略" / "daily_update_strategy.py"
+SOURCE_DIR = PROJECT_ROOT / "源码"
+sys.path.insert(0, str(SOURCE_DIR))
 
-
-def load_module():
-    spec = importlib.util.spec_from_file_location("daily_update_strategy", SCRIPT_PATH)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+from risk_parity import daily_update as module
 
 
 class DailyUpdateStrategyTests(unittest.TestCase):
     def test_run_data_update_passes_end_date_to_update_script(self):
-        module = load_module()
         calls = []
 
         def fake_runner(cmd, **kwargs):
@@ -46,14 +39,10 @@ class DailyUpdateStrategyTests(unittest.TestCase):
         self.assertTrue(kwargs["check"])
 
     def test_parse_args_no_longer_accepts_data_backup(self):
-        module = load_module()
-
         with self.assertRaises(SystemExit):
             module.parse_args(["--data-backup"])
 
     def test_run_stops_when_data_update_fails(self):
-        module = load_module()
-
         def failing_runner(cmd, **kwargs):
             raise subprocess.CalledProcessError(1, cmd)
 
@@ -61,7 +50,6 @@ class DailyUpdateStrategyTests(unittest.TestCase):
             module.run(["--data-end-date", "2026-05-28"], runner=failing_runner)
 
     def test_maybe_run_data_update_skips_runner_when_requested(self):
-        module = load_module()
         args = Namespace(skip_data_update=True, data_end_date=None)
 
         def unexpected_runner(cmd, **kwargs):
@@ -72,7 +60,6 @@ class DailyUpdateStrategyTests(unittest.TestCase):
         self.assertEqual(result, "skipped")
 
     def test_output_paths_use_classified_date_suffix_without_latest_word(self):
-        module = load_module()
         output_dir = Path("out")
 
         paths = module.output_paths(output_dir, pd.Timestamp("2026-05-28"))
@@ -90,7 +77,6 @@ class DailyUpdateStrategyTests(unittest.TestCase):
             self.assertNotIn("最新", path.name)
 
     def test_write_report_creates_classified_full_report_outputs(self):
-        module = load_module()
         target_report = module.TargetReport(
             as_of_date=pd.Timestamp("2026-05-28"),
             observation_date=pd.Timestamp("2026-05-22"),
@@ -160,7 +146,6 @@ class DailyUpdateStrategyTests(unittest.TestCase):
             self.assertIn("回测图表_2026-05-28.png", report_text)
 
     def test_select_observation_date_uses_previous_completed_week_before_friday(self):
-        module = load_module()
         dates = pd.to_datetime(
             [
                 "2026-05-15",
@@ -177,7 +162,6 @@ class DailyUpdateStrategyTests(unittest.TestCase):
         self.assertFalse(result.is_new_observation)
 
     def test_select_observation_date_uses_as_of_date_when_force_observation(self):
-        module = load_module()
         dates = pd.to_datetime(["2026-05-15", "2026-05-18", "2026-05-21"])
 
         result = module.select_observation_date(pd.DatetimeIndex(dates), pd.Timestamp("2026-05-21"), True)

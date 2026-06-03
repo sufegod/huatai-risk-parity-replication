@@ -1,0 +1,2 @@
+"""Risk parity strategy package."""
+
