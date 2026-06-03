@@ -29,6 +29,18 @@ module = load_script_module(
 
 
 class DailyUpdateStrategyTests(unittest.TestCase):
+    def test_daily_update_uses_v018_strategy_script_by_default(self):
+        self.assertEqual(module.STRATEGY_SCRIPT.name, "资产风险平价策略0.18（保证金修改+资金占用显示）.py")
+
+        strategy_module = module.load_strategy_module()
+
+        self.assertEqual(strategy_module.VERSION, "0.18")
+
+    def test_weekly_weight_columns_append_margin_usage(self):
+        columns = module.weekly_weight_columns(["沪深300主连", "10年国债主连"])
+
+        self.assertEqual(columns, ["date", "策略名称", "股指期货信号", "股指期货仓位", "沪深300主连", "10年国债主连", "资金占用比例"])
+
     def test_run_data_update_passes_end_date_to_update_script(self):
         calls = []
 
@@ -129,6 +141,7 @@ class DailyUpdateStrategyTests(unittest.TestCase):
                     "股指期货仓位": [0.15],
                     "沪深300主连": [0.075],
                     "10年国债主连": [0.925],
+                    "资金占用比例": [0.03825],
                 }
             ),
         )

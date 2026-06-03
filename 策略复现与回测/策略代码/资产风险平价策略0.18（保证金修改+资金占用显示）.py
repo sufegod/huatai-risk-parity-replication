@@ -149,6 +149,15 @@ def calculate_metrics(ret_series, margin_series=None):
     return res
 
 
+def get_asset_margin_series(asset, index):
+    margin_ratio = MARGIN_RATIOS.get(asset, 1.0)
+    return pd.Series(margin_ratio, index=index)
+
+
+def calculate_position_margin_usage(weights):
+    return float(sum(weight * MARGIN_RATIOS.get(asset, 1.0) for asset, weight in weights.items()))
+
+
 def load_returns_csv(file_path):
     with file_path.open('r', encoding='utf-8-sig') as returns_file:
         df = pd.read_csv(returns_file, index_col=0, parse_dates=True)
@@ -326,6 +335,7 @@ def main():
                     '策略名称': STRATEGY_NAME,
                     '股指期货信号': float(raw_signal),
                     '股指期货仓位': index_weight,
+                    '资金占用比例': calculate_position_margin_usage(target),
                     **{a: target.loc[a] for a in assets}
                 })
             else:
@@ -352,7 +362,9 @@ def main():
 
     def append_metrics(period_label, start_d, end_d):
         for asset in assets:
-            m = calculate_metrics(df_trade.loc[start_d:end_d, asset])
+            asset_returns = df_trade.loc[start_d:end_d, asset]
+            asset_margin = get_asset_margin_series(asset, asset_returns.index)
+            m = calculate_metrics(asset_returns, asset_margin)
             m['回测区间'] = period_label
             m['组合/资产'] = asset
             all_metrics.append(m)
@@ -386,7 +398,7 @@ def main():
 
     print("\n正在生成周度仓位明细...")
     df_weights_all = pd.DataFrame(weight_recs)
-    weight_cols = ['date', '策略名称', '股指期货信号', '股指期货仓位'] + assets
+    weight_cols = ['date', '策略名称', '股指期货信号', '股指期货仓位'] + assets + ['资金占用比例']
     df_weights_all = df_weights_all[weight_cols]
     weights_filename = WEIGHTS_DIR / f'策略周度仓位明细_v{VERSION}.csv'
     df_weights_all.to_csv(str(weights_filename), index=False, encoding='utf-8-sig')

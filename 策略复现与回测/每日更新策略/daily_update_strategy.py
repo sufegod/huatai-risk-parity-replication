@@ -18,7 +18,7 @@ BACKTEST_DIR = PROJECT_ROOT / "策略复现与回测"
 SCRIPT_DIR = BACKTEST_DIR / "每日更新策略"
 
 DATA_UPDATE_SCRIPT = PROJECT_ROOT / "数据" / "日度收益数据更新" / "日度收益数据更新.py"
-V016_SCRIPT = BACKTEST_DIR / "策略代码" / "资产风险平价策略0.16（周频调仓+股指信号）.py"
+STRATEGY_SCRIPT = BACKTEST_DIR / "策略代码" / "资产风险平价策略0.18（保证金修改+资金占用显示）.py"
 OUTPUT_DIR = SCRIPT_DIR / "输出"
 
 WEIGHT_RETURNS_PATH = PROJECT_ROOT / "数据" / "日度收益数据更新" / "日涨跌幅_填充.csv"
@@ -59,11 +59,11 @@ class BacktestResult:
 Runner = Callable[..., subprocess.CompletedProcess]
 
 
-def load_v016_module(script_path: Path | None = None):
-    script_path = V016_SCRIPT if script_path is None else Path(script_path)
-    spec = importlib.util.spec_from_file_location("v016_strategy_module", script_path)
+def load_strategy_module(script_path: Path | None = None):
+    script_path = STRATEGY_SCRIPT if script_path is None else Path(script_path)
+    spec = importlib.util.spec_from_file_location("strategy_module", script_path)
     if spec is None or spec.loader is None:
-        raise ImportError(f"无法加载v0.16策略脚本: {script_path}")
+        raise ImportError(f"无法加载策略脚本: {script_path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
@@ -71,7 +71,7 @@ def load_v016_module(script_path: Path | None = None):
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="先更新日度数据，再生成v0.16每日策略仓位报告")
+    parser = argparse.ArgumentParser(description="先更新日度数据，再生成v0.18每日策略仓位报告")
     parser.add_argument("--data-end-date", help="传递给每日数据更新脚本的结束日期")
     parser.add_argument("--skip-data-update", action="store_true", help="跳过每日数据更新，仅基于现有CSV生成报告")
     parser.add_argument("--force-observation", action="store_true", help="强制将策略数据日期作为周度观察日")
@@ -117,6 +117,10 @@ def get_weekly_observation_dates(index: pd.DatetimeIndex) -> pd.DatetimeIndex:
     return pd.DatetimeIndex(observations)
 
 
+def weekly_weight_columns(assets: list[str]) -> list[str]:
+    return ["date", "策略名称", "股指期货信号", "股指期货仓位"] + assets + ["资金占用比例"]
+
+
 def select_observation_date(
     trade_index: pd.DatetimeIndex,
     as_of_date: pd.Timestamp,
@@ -157,20 +161,20 @@ def validate_returns_frame(df: pd.DataFrame, required_columns: list[str], label:
         raise ValueError(f"{label}缺少必要列: {', '.join(missing)}")
 
 
-def load_strategy_inputs(v016):
-    df_weight_raw = v016.load_returns_csv(WEIGHT_RETURNS_PATH)
-    df_trade_raw = v016.load_returns_csv(TRADE_RETURNS_PATH)
-    index_signal = v016.load_index_signal(INDEX_SIGNAL_PATH)
+def load_strategy_inputs(strategy):
+    df_weight_raw = strategy.load_returns_csv(WEIGHT_RETURNS_PATH)
+    df_trade_raw = strategy.load_returns_csv(TRADE_RETURNS_PATH)
+    index_signal = strategy.load_index_signal(INDEX_SIGNAL_PATH)
 
     for df in (df_weight_raw, df_trade_raw):
         if "布油连续" in df.columns:
             df.drop(columns=["布油连续"], inplace=True)
 
     active_assets = []
-    for asset in v016.INDEX_FUTURES:
+    for asset in strategy.INDEX_FUTURES:
         if asset not in active_assets:
             active_assets.append(asset)
-    for class_assets in v016.RISK_PARITY_ASSET_CLASSES.values():
+    for class_assets in strategy.RISK_PARITY_ASSET_CLASSES.values():
         for asset in class_assets:
             if asset not in active_assets:
                 active_assets.append(asset)
@@ -181,7 +185,7 @@ def load_strategy_inputs(v016):
 
 
 def compute_target_for_observation(
-    v016,
+    strategy,
     observation_date: pd.Timestamp,
     assets: list[str],
     risk_parity_assets: list[str],
@@ -213,11 +217,11 @@ def compute_target_for_observation(
     if len(lookback) < 150:
         raise ValueError(f"{observation_date:%Y-%m-%d} 的回看窗口不足150个交易日")
 
-    index_target = v016.allocate_index_futures(raw_signal, assets, listing_dates, observation_date)
+    index_target = strategy.allocate_index_futures(raw_signal, assets, listing_dates, observation_date)
     index_weight = float(index_target.sum())
     remaining_weight = max(0.0, 1.0 - index_weight)
 
-    rp_weights = v016.get_risk_parity_weights(v016.calculate_ewma_semi_cov(lookback, v016.EWMA_DECAY))
+    rp_weights = strategy.get_risk_parity_weights(strategy.calculate_ewma_semi_cov(lookback, strategy.EWMA_DECAY))
     target = pd.Series(0.0, index=assets)
     target.loc[index_target.index] = index_target
     target.loc[eligible_rp_assets] = rp_weights * remaining_weight
@@ -225,7 +229,7 @@ def compute_target_for_observation(
 
 
 def find_valid_target(
-    v016,
+    strategy,
     selection: ObservationSelection,
     week_ends: pd.DatetimeIndex,
     assets: list[str],
@@ -237,7 +241,7 @@ def find_valid_target(
 ) -> tuple[pd.Timestamp, pd.Series, float, float]:
     if selection.is_new_observation:
         target, raw_signal, index_weight = compute_target_for_observation(
-            v016,
+            strategy,
             selection.observation_date,
             assets,
             risk_parity_assets,
@@ -252,7 +256,7 @@ def find_valid_target(
     for candidate in reversed(candidates):
         try:
             target, raw_signal, index_weight = compute_target_for_observation(
-                v016,
+                strategy,
                 candidate,
                 assets,
                 risk_parity_assets,
@@ -268,8 +272,8 @@ def find_valid_target(
 
 
 def build_target_report(force_observation: bool = False) -> TargetReport:
-    v016 = load_v016_module()
-    df_weight_raw, df_trade_raw, index_signal, active_assets = load_strategy_inputs(v016)
+    strategy = load_strategy_module()
+    df_weight_raw, df_trade_raw, index_signal, active_assets = load_strategy_inputs(strategy)
 
     df_weight_all = df_weight_raw / 100.0
     df_trade_all_raw = df_trade_raw / 100.0
@@ -281,7 +285,7 @@ def build_target_report(force_observation: bool = False) -> TargetReport:
     df_trade_all = df_trade_all.loc[:as_of_date]
 
     assets = [asset for asset in active_assets if asset in df_weight_all.columns and asset in df_trade_all.columns]
-    risk_parity_assets = [asset for asset in assets if asset not in v016.INDEX_FUTURES]
+    risk_parity_assets = [asset for asset in assets if asset not in strategy.INDEX_FUTURES]
 
     df_weight = df_weight_all[assets].fillna(0)
     df_trade = df_trade_all[assets]
@@ -295,7 +299,7 @@ def build_target_report(force_observation: bool = False) -> TargetReport:
     selection = select_observation_date(df_trade.index, as_of_date, force_observation)
     week_ends = get_weekly_observation_dates(df_trade.index[df_trade.index <= selection.observation_date])
     observation_date, target, raw_signal, index_weight = find_valid_target(
-        v016,
+        strategy,
         selection,
         week_ends,
         assets,
@@ -305,7 +309,7 @@ def build_target_report(force_observation: bool = False) -> TargetReport:
         first_signal_date,
         listing_dates,
     )
-    margin_ratios = pd.Series({asset: v016.MARGIN_RATIOS.get(asset, 1.0) for asset in assets})
+    margin_ratios = pd.Series({asset: strategy.MARGIN_RATIOS.get(asset, 1.0) for asset in assets})
 
     return TargetReport(
         as_of_date=as_of_date,
@@ -319,8 +323,8 @@ def build_target_report(force_observation: bool = False) -> TargetReport:
 
 
 def build_backtest_result() -> BacktestResult:
-    v016 = load_v016_module()
-    df_weight_raw, df_trade_raw, index_signal, active_assets = load_strategy_inputs(v016)
+    strategy = load_strategy_module()
+    df_weight_raw, df_trade_raw, index_signal, active_assets = load_strategy_inputs(strategy)
 
     df_weight_all = df_weight_raw / 100.0
     df_trade_all_raw = df_trade_raw / 100.0
@@ -329,7 +333,7 @@ def build_backtest_result() -> BacktestResult:
 
     repo_rate_ann = df_trade_all.get("一天期国债逆回购", pd.Series(0.0, index=df_trade_all.index))
     assets = [asset for asset in active_assets if asset in df_weight_all.columns and asset in df_trade_all.columns]
-    risk_parity_assets = [asset for asset in assets if asset not in v016.INDEX_FUTURES]
+    risk_parity_assets = [asset for asset in assets if asset not in strategy.INDEX_FUTURES]
 
     df_weight = df_weight_all[assets].fillna(0)
     df_trade = df_trade_all[assets]
@@ -342,9 +346,9 @@ def build_backtest_result() -> BacktestResult:
 
     calendar_days = df_trade_all.index.to_series().diff().dt.days.fillna(1)
     repo_shifted = repo_rate_ann.shift(1).fillna(0)
-    repo_net_yield = np.maximum((repo_shifted / 365.0) * calendar_days - v016.REPO_FEE_RATE, 0.0)
+    repo_net_yield = np.maximum((repo_shifted / 365.0) * calendar_days - strategy.REPO_FEE_RATE, 0.0)
 
-    m_ratios = pd.Series({asset: v016.MARGIN_RATIOS.get(asset, 1.0) for asset in assets})
+    m_ratios = pd.Series({asset: strategy.MARGIN_RATIOS.get(asset, 1.0) for asset in assets})
     week_ends = get_weekly_observation_dates(df_trade.index)
 
     ret_series = pd.Series(0.0, index=df_trade.index)
@@ -376,11 +380,11 @@ def build_backtest_result() -> BacktestResult:
         if len(lookback) < 150:
             continue
 
-        index_target = v016.allocate_index_futures(raw_signal, assets, listing_dates, reb)
+        index_target = strategy.allocate_index_futures(raw_signal, assets, listing_dates, reb)
         index_weight = float(index_target.sum())
         remaining_weight = max(0.0, 1.0 - index_weight)
 
-        rp_active = v016.get_risk_parity_weights(v016.calculate_ewma_semi_cov(lookback, v016.EWMA_DECAY))
+        rp_active = strategy.get_risk_parity_weights(strategy.calculate_ewma_semi_cov(lookback, strategy.EWMA_DECAY))
         target = pd.Series(0.0, index=assets)
         target.loc[index_target.index] = index_target
         target.loc[eligible_rp_assets] = rp_active * remaining_weight
@@ -399,16 +403,17 @@ def build_backtest_result() -> BacktestResult:
                 idle_cash = max(0.0, 1.0 - new_margin)
                 idle_return = idle_cash * daily_repo
 
-                cost = (target - curr_w).abs().sum() * v016.FEE_RATE
+                cost = (target - curr_w).abs().sum() * strategy.FEE_RATE
                 ret_series.loc[date] = (target * daily_return).sum() - cost + idle_return
 
                 curr_w = target.copy()
                 weight_recs.append(
                     {
                         "date": reb,
-                        "策略名称": v016.STRATEGY_NAME,
+                        "策略名称": strategy.STRATEGY_NAME,
                         "股指期货信号": float(raw_signal),
                         "股指期货仓位": index_weight,
+                        "资金占用比例": strategy.calculate_position_margin_usage(target),
                         **{asset: target.loc[asset] for asset in assets},
                     }
                 )
@@ -426,20 +431,22 @@ def build_backtest_result() -> BacktestResult:
         raise ValueError("日期或数据不满足条件")
 
     df_navs = pd.DataFrame(index=df_trade.loc[first_date:].index)
-    df_navs[v016.STRATEGY_NAME] = (1 + ret_series.loc[first_date:]).cumprod()
+    df_navs[strategy.STRATEGY_NAME] = (1 + ret_series.loc[first_date:]).cumprod()
 
     all_metrics = []
 
     def append_metrics(period_label: str, start_date: pd.Timestamp, end_date: pd.Timestamp) -> None:
         for asset in assets:
-            metrics = v016.calculate_metrics(df_trade.loc[start_date:end_date, asset])
+            asset_returns = df_trade.loc[start_date:end_date, asset]
+            asset_margin = strategy.get_asset_margin_series(asset, asset_returns.index)
+            metrics = strategy.calculate_metrics(asset_returns, asset_margin)
             metrics["回测区间"] = period_label
             metrics["组合/资产"] = asset
             all_metrics.append(metrics)
 
-        metrics = v016.calculate_metrics(ret_series.loc[start_date:end_date], margin_series.loc[start_date:end_date])
+        metrics = strategy.calculate_metrics(ret_series.loc[start_date:end_date], margin_series.loc[start_date:end_date])
         metrics["回测区间"] = period_label
-        metrics["组合/资产"] = v016.STRATEGY_NAME
+        metrics["组合/资产"] = strategy.STRATEGY_NAME
         all_metrics.append(metrics)
 
     append_metrics("全局 (Total)", first_date, df_trade.index[-1])
@@ -458,7 +465,7 @@ def build_backtest_result() -> BacktestResult:
     df_metrics = df_metrics[cols_order]
 
     df_weekly_weights = pd.DataFrame(weight_recs)
-    weight_cols = ["date", "策略名称", "股指期货信号", "股指期货仓位"] + assets
+    weight_cols = weekly_weight_columns(assets)
     df_weekly_weights = df_weekly_weights[weight_cols]
 
     return BacktestResult(
@@ -585,7 +592,7 @@ def build_summary_markdown(
 
 
 def render_backtest_chart(backtest_result: BacktestResult, chart_path: Path) -> None:
-    v016 = load_v016_module()
+    strategy = load_strategy_module()
     df_navs = backtest_result.df_navs
     df_weekly_weights = backtest_result.df_weekly_weights
     df_trade = backtest_result.df_trade
@@ -594,7 +601,7 @@ def render_backtest_chart(backtest_result: BacktestResult, chart_path: Path) -> 
 
     fig, axes = plt.subplots(3, 1, figsize=(16, 16), sharex=False)
 
-    axes[0].plot(df_navs.index, df_navs[v016.STRATEGY_NAME], label=v016.STRATEGY_NAME, color="purple", lw=2)
+    axes[0].plot(df_navs.index, df_navs[strategy.STRATEGY_NAME], label=strategy.STRATEGY_NAME, color="purple", lw=2)
     if df_trade is not None and "沪深300主连" in df_trade.columns:
         axes[0].plot((1 + df_trade.loc[first_date:, "沪深300主连"]).cumprod(), label="沪深300主连", color="blue", alpha=0.3)
     if df_trade is not None and "10年国债主连" in df_trade.columns:
@@ -607,7 +614,7 @@ def render_backtest_chart(backtest_result: BacktestResult, chart_path: Path) -> 
     df_classes = pd.DataFrame(
         {
             class_name: df_weights[[asset for asset in class_assets if asset in assets]].sum(axis=1)
-            for class_name, class_assets in v016.PLOT_ASSET_CLASSES.items()
+            for class_name, class_assets in strategy.PLOT_ASSET_CLASSES.items()
         }
     )
     axes[1].stackplot(
@@ -677,3 +684,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
