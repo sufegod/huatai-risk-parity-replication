@@ -1,3 +1,4 @@
+import importlib.util
 import sys
 import unittest
 from pathlib import Path
@@ -6,10 +7,22 @@ import pandas as pd
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SOURCE_DIR = PROJECT_ROOT / "源码"
-sys.path.insert(0, str(SOURCE_DIR))
 
-from risk_parity import rebalance_frequency_experiment as module
+
+def load_script_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load script module: {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+module = load_script_module(
+    "rebalance_frequency_experiment_under_test",
+    PROJECT_ROOT / "策略复现与回测" / "策略测试代码" / "资产风险平价策略0.16_日频调仓测试.py",
+)
 
 
 class RebalanceFrequencyExperimentTests(unittest.TestCase):

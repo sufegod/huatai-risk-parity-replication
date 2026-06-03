@@ -24,32 +24,26 @@ python -m unittest discover -s tests
 仅使用仓库内已有 CSV 复现每日策略报告，不更新外部数据：
 
 ```powershell
-python -m risk_parity.daily_update --skip-data-update
-```
-
-兼容旧入口仍可使用：
-
-```powershell
 python 策略复现与回测\每日更新策略\daily_update_strategy.py --skip-data-update
 ```
 
 生成最新数据并运行每日策略：
 
 ```powershell
-python -m risk_parity.daily_update --data-end-date 2026-05-28
+python 策略复现与回测\每日更新策略\daily_update_strategy.py --data-end-date 2026-05-28
 ```
 
 不指定 `--data-end-date` 时，数据更新脚本会尝试使用各数据源共同可得的最新日期。
 
 ## 目录结构
 
-- `源码/risk_parity/`: 可导入 Python 包，包含每日更新、日度收益数据更新、v0.16 回测核心和调仓频率实验模块。
-- `risk_parity/`: 根目录轻量导入桥接目录，用于支持 `python -m risk_parity.daily_update`；业务代码仍在 `源码/risk_parity/`。
 - `买方宏观预期指标合成/`: 高频宏观因子、预期动量因子相关脚本、数据和图表。
-- `策略复现与回测/`: 风险平价策略回测入口、历史策略版本、回测图表和回测指标。
+- `策略复现与回测/`: 风险平价策略回测入口、历史策略版本、回测图表和回测指标。不同回测版本代码保留在 `策略代码/` 或 `历史策略版本/` 中完整展示。
+- `策略复现与回测/每日更新策略/`: 每日策略报告脚本和按用途分类的输出目录。
+- `策略复现与回测/策略测试代码/`: 参数测试、调仓频率测试等实验脚本。
 - `数据/`: 原始数据、日度收益数据更新入口、更新结果和增量缓存。
 - `策略研报来源/`: 策略复现使用的参考研报。
-- `tests/`: 单元测试，直接导入 `源码/risk_parity/` 下模块。
+- `tests/`: 单元测试，按文件路径加载并验证中文业务目录中的脚本。
 
 ## 本地敏感配置
 

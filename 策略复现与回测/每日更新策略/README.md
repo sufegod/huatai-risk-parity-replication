@@ -1,6 +1,6 @@
 # 每日更新策略
 
-本目录用于生成基于 v0.16 策略逻辑的每日回测报告。脚本运行时会先调用数据更新脚本，更新成功后再读取更新后的日涨跌幅数据，完整生成净值、指标、仓位明细、图表和 Markdown 报告。
+本目录用于生成基于 v0.16 策略逻辑的每日回测报告。脚本运行时会先调用数据更新脚本，更新成功后再读取更新后的日涨跌幅数据，并加载 `策略复现与回测/策略代码/资产风险平价策略0.16（周频调仓+股指信号）.py` 中完整展示的回测代码，生成净值、指标、仓位明细、图表和 Markdown 报告。
 
 ## 运行方式
 
@@ -30,28 +30,22 @@ git check-ignore -v .env
 默认运行：
 
 ```powershell
-python -m risk_parity.daily_update
+python 策略复现与回测\每日更新策略\daily_update_strategy.py
 ```
 
 指定数据更新截止日：
 
 ```powershell
-python -m risk_parity.daily_update --data-end-date 2026-05-28
+python 策略复现与回测\每日更新策略\daily_update_strategy.py --data-end-date 2026-05-28
 ```
 
 短周或节假日前需要把当前数据日视为周度观察日时：
 
 ```powershell
-python -m risk_parity.daily_update --data-end-date 2026-05-28 --force-observation
+python 策略复现与回测\每日更新策略\daily_update_strategy.py --data-end-date 2026-05-28 --force-observation
 ```
 
 仅基于现有 CSV 调试：
-
-```powershell
-python -m risk_parity.daily_update --skip-data-update
-```
-
-兼容旧入口仍可使用：
 
 ```powershell
 python 策略复现与回测\每日更新策略\daily_update_strategy.py --skip-data-update
