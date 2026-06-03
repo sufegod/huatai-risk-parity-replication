@@ -39,7 +39,7 @@ class DailyUpdateStrategyTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         cmd, kwargs = calls[0]
         self.assertEqual(cmd[0], "python")
-        self.assertEqual(Path(cmd[1]).name, "update_daily_returns.py")
+        self.assertEqual(Path(cmd[1]).name, "日度收益数据更新.py")
         self.assertEqual(cmd[2:], ["--end-date", "2026-05-28"])
         self.assertNotIn("--backup", cmd)
         self.assertEqual(Path(kwargs["cwd"]), PROJECT_ROOT)

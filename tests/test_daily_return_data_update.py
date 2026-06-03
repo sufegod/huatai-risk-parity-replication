@@ -1,5 +1,4 @@
 import importlib.util
-import json
 import os
 import shutil
 from pathlib import Path
@@ -11,7 +10,7 @@ import pandas as pd
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SCRIPT_PATH = PROJECT_ROOT / "数据" / "JYDB数据替换" / "update_daily_returns.py"
+SCRIPT_PATH = PROJECT_ROOT / "数据" / "日度收益数据更新" / "日度收益数据更新.py"
 
 
 def load_module():
@@ -41,8 +40,7 @@ class UpdateDailyReturnsTests(unittest.TestCase):
                     "# local secrets",
                     "JYDB_SERVER=192.168.10.48",
                     "JYDB_UID=tsreadonly",
-                    "IFIND_MCP_URL=\"https://ifind.example/mcp\"",
-                    "IFIND_MCP_AUTHORIZATION='Bearer test-token'",
+                    "CUSTOM_VALUE=\"quoted-value\"",
                     "EMPTY_VALUE=",
                     "",
                 ]
@@ -55,8 +53,7 @@ class UpdateDailyReturnsTests(unittest.TestCase):
 
             self.assertEqual(os.environ["JYDB_SERVER"], "192.168.10.48")
             self.assertEqual(os.environ["JYDB_UID"], "tsreadonly")
-            self.assertEqual(os.environ["IFIND_MCP_URL"], "https://ifind.example/mcp")
-            self.assertEqual(os.environ["IFIND_MCP_AUTHORIZATION"], "Bearer test-token")
+            self.assertEqual(os.environ["CUSTOM_VALUE"], "quoted-value")
             self.assertEqual(os.environ["EMPTY_VALUE"], "")
 
     def test_load_env_file_does_not_override_existing_environment(self):
@@ -77,45 +74,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
 
             self.assertEqual(os.environ["JYDB_PWD"], "existing-password")
             self.assertEqual(os.environ["JYDB_SERVER"], "file-server")
-
-    def test_read_ifind_mcp_config_prefers_environment_without_toml(self):
-        module = load_module()
-
-        with patch.dict(
-            os.environ,
-            {
-                "IFIND_MCP_URL": "https://ifind.example/mcp",
-                "IFIND_MCP_AUTHORIZATION": "Bearer env-token",
-            },
-            clear=True,
-        ):
-            url, headers = module.read_ifind_mcp_config(Path("does-not-exist.toml"))
-
-        self.assertEqual(url, "https://ifind.example/mcp")
-        self.assertEqual(headers["Authorization"], "Bearer env-token")
-        self.assertEqual(headers["Content-Type"], "application/json")
-        self.assertEqual(headers["Accept"], "application/json, text/event-stream")
-
-    def test_read_ifind_mcp_config_falls_back_to_toml_when_env_missing(self):
-        module = load_module()
-        config_path = self.workspace_temp_dir("ifind_toml") / "config.toml"
-        config_path.write_text(
-            "\n".join(
-                [
-                    "[mcp_servers.hexin-ifind-ds-edb-mcp]",
-                    'url = "https://ifind.example/toml"',
-                    "[mcp_servers.hexin-ifind-ds-edb-mcp.http_headers]",
-                    'Authorization = "Bearer toml-token"',
-                ]
-            ),
-            encoding="utf-8",
-        )
-
-        with patch.dict(os.environ, {}, clear=True):
-            url, headers = module.read_ifind_mcp_config(config_path)
-
-        self.assertEqual(url, "https://ifind.example/toml")
-        self.assertEqual(headers["Authorization"], "Bearer toml-token")
 
     def test_main_loads_project_env_before_connecting_to_jydb(self):
         module = load_module()
@@ -172,35 +130,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         self.assertAlmostEqual(result.loc[pd.Timestamp("2021-10-25")], 0.0, places=10)
         raw_close_return = (1.036 / 2.072 - 1.0) * 100.0
         self.assertLess(raw_close_return, -49.0)
-
-    def test_parse_ifind_edb_response_unwraps_nested_json_text(self):
-        module = load_module()
-        inner = {
-            "data": {
-                "datas": [
-                    {
-                        "data": {
-                            "columns": ["日期", "GC001(加权平均)"],
-                            "attrs": {
-                                "GC001(加权平均)": {
-                                    "unit": "%",
-                                    "dtype": "double",
-                                    "index_id": "L004369613",
-                                }
-                            },
-                            "data": [["2013-01-07", 3.553], ["2013-01-04", 5.256]],
-                        }
-                    }
-                ]
-            }
-        }
-        outer = {"result": {"content": [{"text": json.dumps(inner, ensure_ascii=False)}]}}
-
-        result = module.parse_ifind_edb_response(outer)
-
-        self.assertEqual(result.name, "一天期国债逆回购")
-        self.assertEqual(list(result.index.strftime("%Y-%m-%d")), ["2013-01-04", "2013-01-07"])
-        self.assertEqual(result.loc[pd.Timestamp("2013-01-04")], 5.256)
 
     def test_merge_cache_frames_replaces_overlap_and_sorts(self):
         module = load_module()
@@ -332,7 +261,6 @@ class UpdateDailyReturnsTests(unittest.TestCase):
             patch.object(module, "read_etf_quote_cache", return_value=etf_cache),
             patch.object(module, "read_gc001_cache", return_value=gc001_cache),
             patch.object(module, "connect_jydb", side_effect=AssertionError("JYDB should not be used")),
-            patch.object(module, "fetch_gc001_weighted_average", side_effect=AssertionError("iFinD should not be used")),
             patch.object(module, "write_returns_csv", side_effect=count_returns),
             patch.object(module, "write_price_csv", side_effect=count_prices),
             patch.object(module, "write_summary", side_effect=count_summary),
@@ -341,6 +269,93 @@ class UpdateDailyReturnsTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(written, {"returns": 2, "prices": 1, "summary": 1})
+
+    def test_fetch_gc001_quote_rows_queries_ftdb_ths_gc(self):
+        module = load_module()
+        captured = {}
+
+        def fake_fetch_dataframe(conn, sql, params):
+            captured["conn"] = conn
+            captured["sql"] = sql
+            captured["params"] = params
+            return pd.DataFrame(
+                {
+                    "日期": ["2026-05-29", "2026-05-28"],
+                    "一天期国债逆回购": [1.084, 1.324],
+                }
+            )
+
+        conn = object()
+        with patch.object(module, "fetch_dataframe", side_effect=fake_fetch_dataframe):
+            result = module.fetch_gc001_quote_rows(
+                conn,
+                pd.Timestamp("2026-05-28"),
+                pd.Timestamp("2026-05-29"),
+            )
+
+        self.assertIs(captured["conn"], conn)
+        self.assertIn("FTDB.dbo.ths_GC", captured["sql"])
+        self.assertIn("thscode = '204001.SH'", captured["sql"])
+        self.assertIn("ths_wgt_avg_interest_bbond", captured["sql"])
+        self.assertEqual(captured["params"], ("2026-05-28", "2026-05-29"))
+        self.assertEqual(list(result.columns), ["日期", "一天期国债逆回购"])
+        self.assertEqual(list(result["日期"].dt.strftime("%Y-%m-%d")), ["2026-05-28", "2026-05-29"])
+        self.assertEqual(result["一天期国债逆回购"].tolist(), [1.324, 1.084])
+
+    def test_refresh_gc001_cache_fetches_from_ftdb_and_replaces_overlap(self):
+        module = load_module()
+        existing = pd.DataFrame(
+            {
+                "日期": pd.to_datetime(["2026-05-28", "2026-05-29"]),
+                "一天期国债逆回购": [1.324, 9.999],
+            }
+        )
+        incoming = pd.DataFrame(
+            {
+                "日期": pd.to_datetime(["2026-05-29", "2026-06-01"]),
+                "一天期国债逆回购": [1.084, 1.372],
+            }
+        )
+        captured = {}
+
+        def capture_write(df, path, columns, dry_run):
+            captured["df"] = df.copy()
+            captured["path_name"] = path.name
+            captured["columns"] = columns
+            captured["dry_run"] = dry_run
+
+        conn = object()
+        with (
+            patch.object(module, "fetch_gc001_quote_rows", return_value=incoming) as fetch_mock,
+            patch.object(module, "write_cache_csv", side_effect=capture_write),
+        ):
+            result, stat = module.refresh_gc001_cache(
+                conn=conn,
+                existing=existing,
+                fallback_start=pd.Timestamp("2013-01-04"),
+                target_end=pd.Timestamp("2026-06-01"),
+                overlap_days=7,
+                full_refresh=False,
+                dry_run=False,
+            )
+
+        fetch_mock.assert_called_once()
+        self.assertIs(fetch_mock.call_args.args[0], conn)
+        self.assertEqual(fetch_mock.call_args.args[1], pd.Timestamp("2026-05-22"))
+        self.assertEqual(fetch_mock.call_args.args[2], pd.Timestamp("2026-06-01"))
+        self.assertEqual(list(result["日期"].dt.strftime("%Y-%m-%d")), ["2026-05-28", "2026-05-29", "2026-06-01"])
+        self.assertEqual(result["一天期国债逆回购"].tolist(), [1.324, 1.084, 1.372])
+        self.assertEqual(stat.fetched_rows, 2)
+        self.assertEqual(stat.cache_rows, 3)
+        self.assertEqual(captured["path_name"], "GC001.csv")
+        self.assertEqual(captured["columns"], module.GC001_CACHE_COLUMNS)
+        self.assertFalse(captured["dry_run"])
+
+    def test_parse_args_no_longer_accepts_ifind_config(self):
+        module = load_module()
+
+        with self.assertRaises(SystemExit):
+            module.parse_args(["--ifind-config", "config.toml"])
 
     def test_write_cache_csv_dry_run_does_not_create_file(self):
         module = load_module()

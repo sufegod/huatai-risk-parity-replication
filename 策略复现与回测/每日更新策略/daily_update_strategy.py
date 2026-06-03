@@ -16,12 +16,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 BACKTEST_DIR = SCRIPT_DIR.parent
 PROJECT_ROOT = BACKTEST_DIR.parent
 
-DATA_UPDATE_SCRIPT = PROJECT_ROOT / "数据" / "JYDB数据替换" / "update_daily_returns.py"
+DATA_UPDATE_SCRIPT = PROJECT_ROOT / "数据" / "日度收益数据更新" / "日度收益数据更新.py"
 V016_SCRIPT = BACKTEST_DIR / "策略代码" / "资产风险平价策略0.16（周频调仓+股指信号）.py"
 OUTPUT_DIR = SCRIPT_DIR / "输出"
 
-WEIGHT_RETURNS_PATH = PROJECT_ROOT / "数据" / "JYDB数据替换" / "日涨跌幅_填充.csv"
-TRADE_RETURNS_PATH = PROJECT_ROOT / "数据" / "JYDB数据替换" / "日涨跌幅_未填充.csv"
+WEIGHT_RETURNS_PATH = PROJECT_ROOT / "数据" / "日度收益数据更新" / "日涨跌幅_填充.csv"
+TRADE_RETURNS_PATH = PROJECT_ROOT / "数据" / "日度收益数据更新" / "日涨跌幅_未填充.csv"
 INDEX_SIGNAL_PATH = PROJECT_ROOT / "数据" / "原始数据" / "股指期货信号.xlsx"
 
 WEEKLY_REBALANCE_FREQ = "W-FRI"

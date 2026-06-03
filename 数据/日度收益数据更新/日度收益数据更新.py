@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
-import tomllib
-import urllib.request
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -16,7 +13,7 @@ import pandas as pd
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parents[1]
-LEGACY_DIR = PROJECT_ROOT / "数据" / "JYDB数据替换"
+LEGACY_DIR = PROJECT_ROOT / "数据" / "日度收益数据更新"
 ENV_FILE = PROJECT_ROOT / ".env"
 
 OUTPUT_FILLED = "日涨跌幅_填充.csv"
@@ -24,18 +21,13 @@ OUTPUT_UNFILLED = "日涨跌幅_未填充.csv"
 LEGACY_FILLED = "日涨跌幅_填充.csv"
 LEGACY_UNFILLED = "日涨跌幅_未填充.csv"
 FUTURES_ADJUSTED_PRICE = "期货主力前复权收盘价.csv"
-SUMMARY_FILE = "日涨跌幅更新摘要.md"
+SUMMARY_FILE = "日度收益数据更新摘要.md"
 CACHE_DIR = SCRIPT_DIR / "增量缓存"
 FUTURES_QUOTE_CACHE = "期货行情.csv"
 ETF_QUOTE_CACHE = "红利低波ETF行情.csv"
 GC001_CACHE = "GC001.csv"
 
 UNUSED_COLUMNS = {"有色ETF", "能源化工ETF", "布油连续"}
-IFIND_SERVER_NAME = "hexin-ifind-ds-edb-mcp"
-IFIND_MCP_URL_ENV = "IFIND_MCP_URL"
-IFIND_MCP_AUTH_ENV = "IFIND_MCP_AUTHORIZATION"
-IFIND_GC001_INDEX_ID = "L004369613"
-IFIND_GC001_FIELD = "GC001(加权平均)"
 REPO_COLUMN = "一天期国债逆回购"
 ETF_COLUMN = "红利低波ETF"
 ETF_INNER_CODE = 201577
@@ -142,31 +134,6 @@ def compute_return_from_prev_close(quotes: pd.DataFrame) -> pd.Series:
     returns = returns.sort_index()
     returns.name = ETF_COLUMN
     return returns
-
-
-def parse_ifind_edb_response(outer: dict[str, Any]) -> pd.Series:
-    text = outer["result"]["content"][0]["text"]
-    inner = json.loads(text)
-    data_block = inner["data"]["datas"][0]["data"]
-    columns = data_block["columns"]
-    attrs = data_block.get("attrs", {})
-    rows = data_block["data"]
-
-    date_col = "日期"
-    value_col = IFIND_GC001_FIELD if IFIND_GC001_FIELD in columns else next(
-        column for column in columns if column != date_col
-    )
-    index_id = attrs.get(value_col, {}).get("index_id")
-    if index_id is not None and index_id != IFIND_GC001_INDEX_ID:
-        raise ValueError(f"iFinD GC001指标ID不匹配: {index_id}")
-
-    frame = pd.DataFrame(rows, columns=columns)
-    frame[date_col] = pd.to_datetime(frame[date_col]).dt.normalize()
-    frame[value_col] = pd.to_numeric(frame[value_col], errors="coerce")
-    series = frame.dropna(subset=[date_col]).set_index(date_col)[value_col].sort_index()
-    series = series[~series.index.duplicated(keep="last")]
-    series.name = REPO_COLUMN
-    return series
 
 
 def read_returns_csv(path: Path) -> pd.DataFrame:
@@ -463,12 +430,26 @@ WHERE InnerCode = ?
     return pd.Timestamp(value).normalize()
 
 
+def fetch_gc001_latest_date(conn: Any) -> pd.Timestamp | None:
+    sql = """
+SELECT MAX(time)
+FROM FTDB.dbo.ths_GC
+WHERE thscode = '204001.SH'
+  AND ths_wgt_avg_interest_bbond IS NOT NULL
+"""
+    value = fetch_scalar(conn, sql, ())
+    if value is None or pd.isna(value):
+        return None
+    return pd.Timestamp(value).normalize()
+
+
 def fetch_jydb_latest_end_date(conn: Any) -> pd.Timestamp:
     dates = [fetch_futures_latest_date(conn, asset) for asset in FUTURES_ASSETS]
     dates.append(fetch_etf_latest_date(conn))
+    dates.append(fetch_gc001_latest_date(conn))
     valid_dates = [date for date in dates if date is not None]
     if not valid_dates:
-        raise RuntimeError("JYDB没有可用最新日期")
+        raise RuntimeError("数据库没有可用最新日期")
     return min(valid_dates)
 
 
@@ -675,95 +656,21 @@ ORDER BY TradingDay
     return normalize_etf_quote_cache(df)
 
 
-def _ifind_headers(authorization: str) -> dict[str, str]:
-    return {
-        "Authorization": authorization,
-        "Content-Type": "application/json",
-        "Accept": "application/json, text/event-stream",
-    }
-
-
-def read_ifind_mcp_config(config_path: Path, server_name: str = IFIND_SERVER_NAME) -> tuple[str, dict[str, str]]:
-    env_url = os.environ.get(IFIND_MCP_URL_ENV)
-    env_authorization = os.environ.get(IFIND_MCP_AUTH_ENV)
-    if env_url and env_authorization:
-        return env_url, _ifind_headers(env_authorization)
-
-    with config_path.open("rb") as file:
-        config = tomllib.load(file)
-    server = config["mcp_servers"][server_name]
-    url = server["url"]
-    headers = dict(server.get("http_headers", {}))
-    if "Authorization" not in headers:
-        raise RuntimeError(f"{config_path} 中 {server_name} 缺少 Authorization")
-    headers.update({"Content-Type": "application/json", "Accept": "application/json, text/event-stream"})
-    return url, headers
-
-
-def _decode_json_or_sse(body: str) -> dict[str, Any]:
-    stripped = body.strip()
-    if stripped.startswith("{"):
-        return json.loads(stripped)
-    data_lines = [line[5:].strip() for line in stripped.splitlines() if line.startswith("data:")]
-    if not data_lines:
-        raise ValueError("MCP响应不是JSON或SSE data")
-    return json.loads(data_lines[-1])
-
-
-def _mcp_post(url: str, headers: dict[str, str], payload: dict[str, Any], session_id: str | None = None) -> tuple[dict[str, str], dict[str, Any]]:
-    request_headers = dict(headers)
-    if session_id:
-        request_headers["mcp-session-id"] = session_id
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers=request_headers,
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=90) as response:
-        body = response.read().decode("utf-8")
-        return dict(response.headers), _decode_json_or_sse(body)
-
-
-def fetch_gc001_weighted_average(start_date: pd.Timestamp, end_date: pd.Timestamp, config_path: Path) -> pd.Series:
-    url, headers = read_ifind_mcp_config(config_path)
-    init_headers, _ = _mcp_post(
-        url,
-        headers,
-        {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "jydb-daily-return-update", "version": "1.0"},
-            },
-        },
-    )
-    session_id = init_headers.get("mcp-session-id") or init_headers.get("Mcp-Session-Id")
-    if not session_id:
-        raise RuntimeError("iFinD MCP initialize响应缺少mcp-session-id")
-    _mcp_post(url, headers, {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}}, session_id)
-    _, result = _mcp_post(
-        url,
-        headers,
-        {
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/call",
-            "params": {
-                "name": "get_edb_data",
-                "arguments": {
-                    "query": (
-                        f"查询GC001(加权平均)从{start_date:%Y-%m-%d}至{end_date:%Y-%m-%d}的日度数据"
-                    )
-                },
-            },
-        },
-        session_id,
-    )
-    return parse_ifind_edb_response(result)
+def fetch_gc001_quote_rows(conn: Any, start_date: pd.Timestamp, end_date: pd.Timestamp) -> pd.DataFrame:
+    sql = """
+SELECT
+    CAST(time AS date) AS 日期,
+    CAST(ths_wgt_avg_interest_bbond AS float) AS 一天期国债逆回购
+FROM FTDB.dbo.ths_GC
+WHERE thscode = '204001.SH'
+  AND time BETWEEN ? AND ?
+  AND ths_wgt_avg_interest_bbond IS NOT NULL
+ORDER BY time
+"""
+    df = fetch_dataframe(conn, sql, (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")))
+    if df.empty:
+        return _empty_frame(GC001_CACHE_COLUMNS)
+    return normalize_gc001_cache(df)
 
 
 def _date_text(value: pd.Timestamp | None) -> str:
@@ -853,22 +760,20 @@ def refresh_etf_quote_cache(
 
 
 def refresh_gc001_cache(
+    conn: Any,
     existing: pd.DataFrame,
     fallback_start: pd.Timestamp,
     target_end: pd.Timestamp,
     overlap_days: int,
     full_refresh: bool,
     dry_run: bool,
-    config_path: Path,
 ) -> tuple[pd.DataFrame, CacheUpdateStat]:
     existing = _empty_frame(GC001_CACHE_COLUMNS) if full_refresh else normalize_gc001_cache(existing)
     if should_skip_fetch(existing, target_end, full_refresh):
         return existing, _skipped_stat("GC001", existing, target_end)
 
     query_start = calculate_incremental_start(existing, fallback_start, overlap_days, full_refresh)
-    incoming_series = fetch_gc001_weighted_average(query_start, target_end, config_path)
-    incoming = incoming_series.rename(REPO_COLUMN).reset_index()
-    incoming = incoming.rename(columns={incoming.columns[0]: "日期"})
+    incoming = fetch_gc001_quote_rows(conn, query_start, target_end)
     incoming = normalize_gc001_cache(incoming)
     merged = merge_cache_frames(existing, incoming, key_columns=["日期"], sort_columns=["日期"])
     merged = normalize_gc001_cache(merged)
@@ -935,7 +840,7 @@ def write_summary(
     cache_stats: list[CacheUpdateStat] | None = None,
 ) -> None:
     lines = [
-        "# 日涨跌幅更新摘要",
+        "# 日度收益数据更新摘要",
         "",
         f"- 更新时间：`{datetime.now():%Y-%m-%d %H:%M:%S}`",
         f"- 日期范围：`{start_date:%Y-%m-%d}` 至 `{end_date:%Y-%m-%d}`",
@@ -943,7 +848,7 @@ def write_summary(
         f"- 未填充版行数：`{len(unfilled)}`",
         f"- 输出列：`{', '.join(OUTPUT_COLUMNS)}`",
         "- 红利低波ETF：JYDB `512890.SH`，按 `ClosePrice / PrevClosePrice - 1` 计算百分比涨跌幅。",
-        "- 一天期国债逆回购：iFinD EDB `L004369613 / GC001(加权平均)`，单位 `%`，直接作为年化利率。",
+        "- 一天期国债逆回购：FTDB `dbo.ths_GC / 204001.SH / ths_wgt_avg_interest_bbond`，单位 `%`，直接作为年化利率。",
         "",
         "## 缺失值",
         "",
@@ -1015,9 +920,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--lookback-days", type=int, default=60, help="期货复权查询向前回看天数")
     parser.add_argument("--cache-overlap-days", type=int, default=7, help="增量缓存更新时向前覆盖的天数")
     parser.add_argument("--full-refresh", action="store_true", help="忽略现有缓存，从数据源重新初始化缓存和输出")
-    parser.add_argument("--rebuild-from-cache", action="store_true", help="不访问JYDB/iFinD，只用现有缓存重算输出")
+    parser.add_argument("--rebuild-from-cache", action="store_true", help="不访问数据库，只用现有缓存重算输出")
     parser.add_argument("--dry-run", action="store_true", help="只执行查询和校验，不写文件")
-    parser.add_argument("--ifind-config", default=str(Path.home() / ".codex" / "config.toml"), help="Codex config.toml路径")
     parser.add_argument("--jydb-server")
     parser.add_argument("--jydb-database")
     parser.add_argument("--jydb-uid")
@@ -1075,19 +979,19 @@ def main(argv: list[str] | None = None) -> int:
                 args.full_refresh,
                 args.dry_run,
             )
+            gc001_cache_existing = read_gc001_cache(missing_ok=True)
+            gc001_cache, gc001_stat = refresh_gc001_cache(
+                conn,
+                gc001_cache_existing,
+                start_date,
+                initial_end,
+                args.cache_overlap_days,
+                args.full_refresh,
+                args.dry_run,
+            )
         finally:
             conn.close()
 
-        gc001_cache_existing = read_gc001_cache(missing_ok=True)
-        gc001_cache, gc001_stat = refresh_gc001_cache(
-            gc001_cache_existing,
-            start_date,
-            initial_end,
-            args.cache_overlap_days,
-            args.full_refresh,
-            args.dry_run,
-            Path(args.ifind_config),
-        )
         cache_stats = [futures_stat, etf_stat, gc001_stat]
 
     futures_returns, futures_prices, futures_summary = build_futures_outputs_from_cache(

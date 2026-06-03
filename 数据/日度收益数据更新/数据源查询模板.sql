@@ -1,6 +1,6 @@
--- JYDB 数据查询 SQL 模板
--- 数据库: JYDB
--- 日期范围由 update_daily_returns.py 参数化传入
+-- 日度收益数据查询 SQL 模板
+-- 数据库: JYDB / FTDB
+-- 日期范围由 日度收益数据更新.py 参数化传入
 -- 注意: 实际抽取使用参数化查询；此文件不包含数据库密码。
 
 -- 金融期货: dbo.Fut_TradingQuote
@@ -57,5 +57,12 @@ PTA主连,dbo.Fut_DailyQuote,15,322,TA,郑商所PTA期货
 原油主连,dbo.Fut_DailyQuote,11,319,SC,上海原油期货
 红利低波ETF,dbo.DZ_DailyQuote,,,512890.SH,华泰柏瑞中证红利低波动ETF
 
--- 一天期国债逆回购不使用 JYDB 的 204001.SH 开高低收字段。
--- 使用 iFinD MCP get_edb_data 查询 L004369613 / GC001(加权平均)，单位 %。
+-- 一天期国债逆回购: FTDB GC001 加权平均利率，单位 %
+SELECT
+    CAST(time AS date) AS 日期,
+    CAST(ths_wgt_avg_interest_bbond AS float) AS 一天期国债逆回购
+FROM FTDB.dbo.ths_GC
+WHERE thscode = '204001.SH'
+  AND time BETWEEN ? AND ?
+  AND ths_wgt_avg_interest_bbond IS NOT NULL
+ORDER BY time;

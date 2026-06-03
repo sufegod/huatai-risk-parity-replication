@@ -20,7 +20,7 @@ notepad .env
 git check-ignore -v .env
 ```
 
-`.env` 会由 `数据/JYDB数据替换/update_daily_returns.py` 自动读取，不会提交到 GitHub。需要填写：
+`.env` 会由 `数据/日度收益数据更新/日度收益数据更新.py` 自动读取，不会提交到 GitHub。需要填写：
 
 - `JYDB_DRIVER`：SQL Server ODBC 驱动名，默认 `ODBC Driver 17 for SQL Server`。
 - `JYDB_SERVER`：JYDB SQL Server 地址。
@@ -59,13 +59,7 @@ python 策略复现与回测\每日更新策略\daily_update_strategy.py --skip-
 单独测试数据更新链路：
 
 ```powershell
-python 数据\JYDB数据替换\update_daily_returns.py --end-date 2026-05-28 --dry-run
-```
-
-覆盖输出前备份旧文件：
-
-```powershell
-python 数据\JYDB数据替换\update_daily_returns.py --end-date 2026-05-28 --backup
+python 数据\日度收益数据更新\日度收益数据更新.py --end-date 2026-05-28 --dry-run
 ```
 
 不要把真实数据库密码、iFinD token、Authorization 写入 README、提交信息、issue、PR 或日志。`.env` 只用于线下分发和本地运行。
@@ -74,8 +68,8 @@ python 数据\JYDB数据替换\update_daily_returns.py --end-date 2026-05-28 --b
 
 输入文件：
 
-- `数据/JYDB数据替换/日涨跌幅_填充.csv`
-- `数据/JYDB数据替换/日涨跌幅_未填充.csv`
+- `数据/日度收益数据更新/日涨跌幅_填充.csv`
+- `数据/日度收益数据更新/日涨跌幅_未填充.csv`
 - `数据/原始数据/股指期货信号.xlsx`
 
 输出文件位于 `策略复现与回测/每日更新策略/输出`，并按用途分类：

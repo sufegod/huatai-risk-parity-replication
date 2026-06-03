@@ -17,7 +17,7 @@ warnings.filterwarnings('ignore')
 
 # ================= 配置参数 =================
 VERSION = '0.14'
-FILE_PATH_RETURNS = BASE_DIR.parent / '数据' / 'JYDB数据替换' / '日涨跌幅_填充.csv'
+FILE_PATH_RETURNS = BASE_DIR.parent / '数据' / '日度收益数据更新' / '日涨跌幅_填充.csv'
 FILE_PATH_MOM = BASE_DIR.parent / '买方宏观预期指标合成' / '预期动量' / '增长预期动量与通胀预期动量数据.csv'
 METRICS_DIR = BASE_DIR / '回测指标'
 CHART_DIR = BASE_DIR / '回测图表'
