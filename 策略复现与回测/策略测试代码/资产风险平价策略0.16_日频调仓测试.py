@@ -26,6 +26,10 @@ FILE_PATH_WEIGHT_RETURNS = PROJECT_DIR / "数据" / "日度收益数据更新" /
 FILE_PATH_TRADE_RETURNS = PROJECT_DIR / "数据" / "日度收益数据更新" / "日涨跌幅_未填充.csv"
 FILE_PATH_INDEX_SIGNAL = PROJECT_DIR / "数据" / "原始数据" / "股指期货信号.xlsx"
 METRICS_DIR = BACKTEST_DIR / "回测指标"
+NAV_DIR = METRICS_DIR / "净值"
+PERFORMANCE_DIR = METRICS_DIR / "指标"
+WEIGHTS_DIR = METRICS_DIR / "仓位明细"
+COMPARISON_DIR = METRICS_DIR / "对比结果"
 CHART_DIR = BACKTEST_DIR / "回测图表"
 COMPARE_DOC_DIR = BACKTEST_DIR / "回测结果对比说明"
 
@@ -289,6 +293,9 @@ def run_backtest(rebalance_mode, version):
 
     print(f"正在执行 v0.16 {rebalance_mode} 调仓回测，输出版本 v{version}...")
     METRICS_DIR.mkdir(exist_ok=True)
+    NAV_DIR.mkdir(exist_ok=True)
+    PERFORMANCE_DIR.mkdir(exist_ok=True)
+    WEIGHTS_DIR.mkdir(exist_ok=True)
     CHART_DIR.mkdir(exist_ok=True)
 
     df_weight_all, df_trade_all_raw, df_trade_all, index_signal, assets = build_input_data()
@@ -401,7 +408,7 @@ def run_backtest(rebalance_mode, version):
 
     df_navs = pd.DataFrame(index=df_trade.loc[first_date:].index)
     df_navs[STRATEGY_NAME] = (1 + ret_series.loc[first_date:]).cumprod()
-    navs_filename = METRICS_DIR / f"策略每日净值走势_v{version}.csv"
+    navs_filename = NAV_DIR / f"策略每日净值走势_v{version}.csv"
     df_navs.to_csv(str(navs_filename), encoding="utf-8-sig")
 
     all_metrics = []
@@ -450,7 +457,7 @@ def run_backtest(rebalance_mode, version):
     cols_order = [col for col in cols_order if col in df_metrics.columns]
     df_metrics = df_metrics[cols_order]
 
-    metrics_filename = METRICS_DIR / f"年度及全局回测指标_v{version}.csv"
+    metrics_filename = PERFORMANCE_DIR / f"年度及全局回测指标_v{version}.csv"
     df_metrics.to_csv(str(metrics_filename), index=False, encoding="utf-8-sig")
 
     df_weights = pd.DataFrame(weight_recs)
@@ -465,7 +472,7 @@ def run_backtest(rebalance_mode, version):
         "交易成本",
     ] + assets
     df_weights = df_weights[weight_cols]
-    weights_filename = METRICS_DIR / f"策略调仓仓位明细_v{version}.csv"
+    weights_filename = WEIGHTS_DIR / f"策略调仓仓位明细_v{version}.csv"
     df_weights.to_csv(str(weights_filename), index=False, encoding="utf-8-sig")
 
     chart_filename = CHART_DIR / f"回测图表_v{version}.png"
@@ -625,10 +632,11 @@ def write_comparison_report(weekly_result, daily_result, comparison_path, report
 
 def main():
     COMPARE_DOC_DIR.mkdir(exist_ok=True)
+    COMPARISON_DIR.mkdir(exist_ok=True)
     weekly_result = run_backtest("weekly", "0.16_weekly_rerun")
     daily_result = run_backtest("daily", "0.16_daily_rebalance_test")
 
-    comparison_path = METRICS_DIR / "v0.16周频_vs_日频调仓对比.csv"
+    comparison_path = COMPARISON_DIR / "v0.16周频_vs_日频调仓对比.csv"
     report_path = COMPARE_DOC_DIR / "v0.16周频与日频调仓对比说明.md"
     df_compare, conclusion = write_comparison_report(weekly_result, daily_result, comparison_path, report_path)
 

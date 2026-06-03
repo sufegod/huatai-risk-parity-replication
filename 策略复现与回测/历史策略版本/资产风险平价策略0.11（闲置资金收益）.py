@@ -4,13 +4,18 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from scipy.optimize import minimize
 import warnings
+from pathlib import Path
 
 warnings.filterwarnings('ignore')
 
 # ================= 配置参数 =================
-VERSION = '0.11'
-FILE_PATH_ETF = '../数据/原始数据/风险平价回测数据.xlsx'
-FILE_PATH_MOM = '../买方宏观预期指标合成/预期动量/增长预期动量与通胀预期动量数据.csv'
+VERSION = '0.11'BASE_DIR = Path(__file__).resolve().parent
+BACKTEST_DIR = BASE_DIR.parent
+PROJECT_DIR = BACKTEST_DIR.parent
+PERFORMANCE_DIR = BACKTEST_DIR / '回测指标' / '指标'
+
+FILE_PATH_ETF = PROJECT_DIR / '数据' / '原始数据' / '风险平价回测数据.xlsx'
+FILE_PATH_MOM = PROJECT_DIR / '买方宏观预期指标合成' / '预期动量' / '增长预期动量与通胀预期动量数据.csv'
 SHEET_NAME = '日涨跌幅'
 FEE_RATE = 0.0005
 REPO_FEE_RATE = 0.000001  # 逆回购单笔交易费率：百万分之一
@@ -207,7 +212,9 @@ def main():
 
     df_m = pd.DataFrame(metrics).set_index('组合/资产')
     print(df_m.tail(3).to_markdown())
-    df_m.to_csv(f'回测指标_v{VERSION}.csv', encoding='utf-8-sig')
+    PERFORMANCE_DIR.mkdir(parents=True, exist_ok=True)
+    metrics_path = PERFORMANCE_DIR / f'回测指标_v{VERSION}.csv'
+    df_m.to_csv(metrics_path, encoding='utf-8-sig')
 
     # 绘图
     fig, axes = plt.subplots(4, 1, figsize=(16, 20))
@@ -245,3 +252,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

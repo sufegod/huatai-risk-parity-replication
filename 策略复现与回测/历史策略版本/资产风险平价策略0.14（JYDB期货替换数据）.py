@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
+BACKTEST_DIR = BASE_DIR.parent
+PROJECT_DIR = BACKTEST_DIR.parent
 MPLCONFIG_DIR = BASE_DIR / '.matplotlib'
 MPLCONFIG_DIR.mkdir(exist_ok=True)
 os.environ.setdefault('MPLCONFIGDIR', str(MPLCONFIG_DIR))
@@ -17,10 +19,13 @@ warnings.filterwarnings('ignore')
 
 # ================= 配置参数 =================
 VERSION = '0.14'
-FILE_PATH_RETURNS = BASE_DIR.parent / '数据' / '日度收益数据更新' / '日涨跌幅_填充.csv'
-FILE_PATH_MOM = BASE_DIR.parent / '买方宏观预期指标合成' / '预期动量' / '增长预期动量与通胀预期动量数据.csv'
-METRICS_DIR = BASE_DIR / '回测指标'
-CHART_DIR = BASE_DIR / '回测图表'
+FILE_PATH_RETURNS = PROJECT_DIR / '数据' / '日度收益数据更新' / '日涨跌幅_填充.csv'
+FILE_PATH_MOM = PROJECT_DIR / '买方宏观预期指标合成' / '预期动量' / '增长预期动量与通胀预期动量数据.csv'
+METRICS_DIR = BACKTEST_DIR / '回测指标'
+NAV_DIR = METRICS_DIR / '净值'
+PERFORMANCE_DIR = METRICS_DIR / '指标'
+WEIGHTS_DIR = METRICS_DIR / '仓位明细'
+CHART_DIR = BACKTEST_DIR / '回测图表'
 MONTH_END_FREQ = 'M'
 FEE_RATE = 0.0005
 REPO_FEE_RATE = 0.000001
@@ -116,6 +121,9 @@ def calculate_metrics(ret_series, rf_series, margin_series=None):
 def main():
     print(f"正在执行回测框架 v{VERSION}...")
     METRICS_DIR.mkdir(exist_ok=True)
+    NAV_DIR.mkdir(exist_ok=True)
+    PERFORMANCE_DIR.mkdir(exist_ok=True)
+    WEIGHTS_DIR.mkdir(exist_ok=True)
     CHART_DIR.mkdir(exist_ok=True)
 
     with FILE_PATH_RETURNS.open('r', encoding='utf-8-sig') as returns_file:
@@ -222,7 +230,7 @@ def main():
     df_navs = pd.DataFrame(index=df_etf.loc[first_date:].index)
     for s in strats:
         df_navs[s] = (1 + ret_dfs[s].loc[first_date:]).cumprod()
-    navs_filename = METRICS_DIR / f'策略每日净值走势_v{VERSION}.csv'
+    navs_filename = NAV_DIR / f'策略每日净值走势_v{VERSION}.csv'
     df_navs.to_csv(str(navs_filename), encoding='utf-8-sig')
 
     print(f"正在计算年度与全局指标...")
@@ -256,7 +264,7 @@ def main():
     cols_order = [c for c in cols_order if c in df_m_all.columns]
     df_m_all = df_m_all[cols_order]
 
-    metrics_filename = METRICS_DIR / f'年度及全局回测指标_v{VERSION}.csv'
+    metrics_filename = PERFORMANCE_DIR / f'年度及全局回测指标_v{VERSION}.csv'
     df_m_all.to_csv(str(metrics_filename), index=False, encoding='utf-8-sig')
 
     print("\n[全局回测总览]")
@@ -271,7 +279,7 @@ def main():
         all_weight_dfs.append(df_w_temp)
 
     df_weights_all = pd.concat(all_weight_dfs, ignore_index=True)
-    weights_filename = METRICS_DIR / f'策略月度仓位明细_v{VERSION}.csv'
+    weights_filename = WEIGHTS_DIR / f'策略月度仓位明细_v{VERSION}.csv'
     df_weights_all.to_csv(str(weights_filename), index=False, encoding='utf-8-sig')
 
     print(f"\n数据文件已生成：\n 1. {navs_filename}\n 2. {metrics_filename}\n 3. {weights_filename}")

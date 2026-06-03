@@ -4,12 +4,17 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from scipy.optimize import minimize
 import warnings
+from pathlib import Path
 
 warnings.filterwarnings('ignore')
 
 # ================= 配置参数 =================
-VERSION = '0.02'
-FILE_PATH = '../数据/原始数据/ETF风险平价回测数据.xlsx'
+VERSION = '0.02'BASE_DIR = Path(__file__).resolve().parent
+BACKTEST_DIR = BASE_DIR.parent
+PROJECT_DIR = BACKTEST_DIR.parent
+PERFORMANCE_DIR = BACKTEST_DIR / '回测指标' / '指标'
+
+FILE_PATH = PROJECT_DIR / '数据' / '原始数据' / 'ETF风险平价回测数据.xlsx'
 SHEET_NAME = '日涨跌幅'
 FEE_RATE = 0.0005  # 单边万分之五交易费率
 RISK_FREE_RATE = 0.0  # 计算夏普比率时的无风险利率
@@ -166,7 +171,8 @@ def main():
 
     print(df_metrics.to_markdown())
 
-    csv_filename = f'回测指标_v{VERSION}.csv'
+    PERFORMANCE_DIR.mkdir(parents=True, exist_ok=True)
+    csv_filename = PERFORMANCE_DIR / f'回测指标_v{VERSION}.csv'
     df_metrics.to_csv(csv_filename, encoding='utf-8-sig')
     print(f"\n指标已存至: {csv_filename}")
 

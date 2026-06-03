@@ -4,13 +4,18 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from scipy.optimize import minimize
 import warnings
+from pathlib import Path
 
 warnings.filterwarnings('ignore')
 
 # ================= 配置参数 =================
-VERSION = '0.08'
-FILE_PATH_ETF = '../数据/原始数据/ETF风险平价回测数据.xlsx'
-FILE_PATH_MOM = '../买方宏观预期指标合成/预期动量/增长预期动量与通胀预期动量数据.csv'
+VERSION = '0.08'BASE_DIR = Path(__file__).resolve().parent
+BACKTEST_DIR = BASE_DIR.parent
+PROJECT_DIR = BACKTEST_DIR.parent
+PERFORMANCE_DIR = BACKTEST_DIR / '回测指标' / '指标'
+
+FILE_PATH_ETF = PROJECT_DIR / '数据' / '原始数据' / 'ETF风险平价回测数据.xlsx'
+FILE_PATH_MOM = PROJECT_DIR / '买方宏观预期指标合成' / '预期动量' / '增长预期动量与通胀预期动量数据.csv'
 SHEET_NAME = '日涨跌幅'
 FEE_RATE = 0.0005
 RISK_FREE_RATE = 0.0
@@ -234,7 +239,8 @@ def main():
     df_metrics = df_metrics[cols].set_index('资产')
 
     print(df_metrics.to_markdown())
-    csv_filename = f'回测指标_v{VERSION}.csv'
+    PERFORMANCE_DIR.mkdir(parents=True, exist_ok=True)
+    csv_filename = PERFORMANCE_DIR / f'回测指标_v{VERSION}.csv'
     df_metrics.to_csv(csv_filename, encoding='utf-8-sig')
 
     # ================= 绘图 (扩展为三联图) =================
@@ -289,3 +295,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

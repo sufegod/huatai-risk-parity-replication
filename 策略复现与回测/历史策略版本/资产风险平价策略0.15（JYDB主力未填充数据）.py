@@ -23,6 +23,9 @@ FILE_PATH_WEIGHT_RETURNS = PROJECT_DIR / '数据' / '日度收益数据更新' /
 FILE_PATH_TRADE_RETURNS = PROJECT_DIR / '数据' / '日度收益数据更新' / '日涨跌幅_未填充.csv'
 FILE_PATH_MOM = PROJECT_DIR / '买方宏观预期指标合成' / '预期动量' / '增长预期动量与通胀预期动量数据.csv'
 METRICS_DIR = BACKTEST_DIR / '回测指标'
+NAV_DIR = METRICS_DIR / '净值'
+PERFORMANCE_DIR = METRICS_DIR / '指标'
+WEIGHTS_DIR = METRICS_DIR / '仓位明细'
 CHART_DIR = BACKTEST_DIR / '回测图表'
 MONTH_END_FREQ = 'M'
 FEE_RATE = 0.0005
@@ -121,6 +124,9 @@ def load_returns_csv(file_path):
 def main():
     print(f"正在执行回测框架 v{VERSION}...")
     METRICS_DIR.mkdir(exist_ok=True)
+    NAV_DIR.mkdir(exist_ok=True)
+    PERFORMANCE_DIR.mkdir(exist_ok=True)
+    WEIGHTS_DIR.mkdir(exist_ok=True)
     CHART_DIR.mkdir(exist_ok=True)
 
     df_weight_raw = load_returns_csv(FILE_PATH_WEIGHT_RETURNS)
@@ -253,7 +259,7 @@ def main():
     df_navs = pd.DataFrame(index=df_trade.loc[first_date:].index)
     for s in strats:
         df_navs[s] = (1 + ret_dfs[s].loc[first_date:]).cumprod()
-    navs_filename = METRICS_DIR / f'策略每日净值走势_v{VERSION}.csv'
+    navs_filename = NAV_DIR / f'策略每日净值走势_v{VERSION}.csv'
     df_navs.to_csv(str(navs_filename), encoding='utf-8-sig')
 
     print(f"正在计算年度与全局指标...")
@@ -286,7 +292,7 @@ def main():
     cols_order = [c for c in cols_order if c in df_m_all.columns]
     df_m_all = df_m_all[cols_order]
 
-    metrics_filename = METRICS_DIR / f'年度及全局回测指标_v{VERSION}.csv'
+    metrics_filename = PERFORMANCE_DIR / f'年度及全局回测指标_v{VERSION}.csv'
     df_m_all.to_csv(str(metrics_filename), index=False, encoding='utf-8-sig')
 
     print("\n[全局回测总览]")
@@ -302,7 +308,7 @@ def main():
 
     df_weights_all = pd.concat(all_weight_dfs, ignore_index=True)
     df_weights_all = df_weights_all[['date', '策略名称'] + assets]
-    weights_filename = METRICS_DIR / f'策略月度仓位明细_v{VERSION}.csv'
+    weights_filename = WEIGHTS_DIR / f'策略月度仓位明细_v{VERSION}.csv'
     df_weights_all.to_csv(str(weights_filename), index=False, encoding='utf-8-sig')
 
     print(f"\n数据文件已生成：\n 1. {navs_filename}\n 2. {metrics_filename}\n 3. {weights_filename}")

@@ -22,7 +22,9 @@ FILE_PATH_WEIGHT_RETURNS = PROJECT_DIR / '数据' / '日度收益数据更新' /
 FILE_PATH_TRADE_RETURNS = PROJECT_DIR / '数据' / '日度收益数据更新' / '日涨跌幅_未填充.csv'
 FILE_PATH_INDEX_SIGNAL = PROJECT_DIR / '数据' / '原始数据' / '股指期货信号.xlsx'
 METRICS_DIR = BACKTEST_DIR / '回测指标'
-FILE_PATH_V016_WEIGHTS = METRICS_DIR / '策略周度仓位明细_v0.16.csv'
+WEIGHTS_DIR = METRICS_DIR / '仓位明细'
+PARAMETER_TEST_DIR = METRICS_DIR / '参数测试'
+FILE_PATH_V016_WEIGHTS = WEIGHTS_DIR / '策略周度仓位明细_v0.16.csv'
 
 try:
     pd.Series([1], index=pd.to_datetime(['2000-01-01'])).resample('ME').sum()
@@ -376,6 +378,7 @@ def append_period_result(
 def main():
     print(f"正在执行 v{VERSION} 风险预算参数敏感性测试...")
     METRICS_DIR.mkdir(exist_ok=True)
+    PARAMETER_TEST_DIR.mkdir(exist_ok=True)
     data = load_data()
     reference_weights = load_reference_v016_weights()
     results = []
@@ -430,7 +433,7 @@ def main():
                     )
 
     df_results = pd.DataFrame(results)
-    output_file = METRICS_DIR / f'风险预算参数敏感性测试_v{VERSION}.csv'
+    output_file = PARAMETER_TEST_DIR / f'风险预算参数敏感性测试_v{VERSION}.csv'
     df_results.to_csv(str(output_file), index=False, encoding='utf-8-sig')
     print(f"敏感性测试结果已生成：{output_file}")
 

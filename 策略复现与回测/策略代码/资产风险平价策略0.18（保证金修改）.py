@@ -1,9 +1,10 @@
 import os
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
-BACKTEST_DIR = BASE_DIR.parent
-PROJECT_DIR = BACKTEST_DIR.parent
+PACKAGE_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = PACKAGE_DIR.parents[1]
+BACKTEST_DIR = PROJECT_DIR / '策略复现与回测'
+BASE_DIR = BACKTEST_DIR / '策略代码'
 MPLCONFIG_DIR = BASE_DIR / '.matplotlib'
 MPLCONFIG_DIR.mkdir(exist_ok=True)
 os.environ.setdefault('MPLCONFIGDIR', str(MPLCONFIG_DIR))
@@ -18,7 +19,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # ================= 配置参数 =================
-VERSION = '0.16_3'
+VERSION = '0.18'
 STRATEGY_NAME = '风险平价策略'
 
 FILE_PATH_WEIGHT_RETURNS = PROJECT_DIR / '数据' / '日度收益数据更新' / '日涨跌幅_填充.csv'
@@ -30,27 +31,44 @@ PERFORMANCE_DIR = METRICS_DIR / '指标'
 WEIGHTS_DIR = METRICS_DIR / '仓位明细'
 CHART_DIR = BACKTEST_DIR / '回测图表'
 
-MONTH_END_FREQ = 'ME'
+MONTH_END_FREQ = 'M'
 WEEKLY_REBALANCE_FREQ = 'W-FRI'
 FEE_RATE = 0.0005
 REPO_FEE_RATE = 0.000001
 EWMA_DECAY = 0.97
-INDEX_BASE_WEIGHT = 0.20
-INDEX_VOL_TARGET = 0.10
-INDEX_VOL_WINDOW = 60
+INDEX_BASE_WEIGHT = 0.30
 INDEX_FUTURES = ['沪深300主连', '中证1000主连']
 
-try:
-    pd.date_range('2000-01-01', periods=1, freq=MONTH_END_FREQ)
-except ValueError:
-    MONTH_END_FREQ = 'M'
-
-MARGIN_RATIOS = {
-    '沪深300主连': 0.15, '中证1000主连': 0.15, '红利低波ETF': 1.0,
-    '10年国债主连': 0.03, '30年国债主连': 0.03,
-    '沪铜主连': 0.10, '沪铝主连': 0.10, 'PTA主连': 0.10, '原油主连': 0.10, '豆粕主连': 0.10,
-    '沪金主连': 0.10
+MARGIN_RATIOS_EXCHANGE_MIN = {
+    '沪深300主连': 0.08,
+    '中证1000主连': 0.08,
+    '红利低波ETF': 1.00,
+    '10年国债主连': 0.02,
+    '30年国债主连': 0.035,
+    '沪铜主连': 0.05,
+    '沪铝主连': 0.05,
+    'PTA主连': 0.05,
+    '原油主连': 0.05,
+    '豆粕主连': 0.05,
+    '沪金主连': 0.04
 }
+
+MARGIN_RATIOS_BROKER = {
+    '沪深300主连': 0.14,
+    '中证1000主连': 0.14,
+    '红利低波ETF': 1.00,
+    '10年国债主连': 0.025,
+    '30年国债主连': 0.05,
+    '沪铜主连': 0.16,
+    '沪铝主连': 0.16,
+    'PTA主连': 0.17,
+    '原油主连': 0.32,
+    '豆粕主连': 0.13,
+    '沪金主连': 0.28
+}
+
+# 默认使用期货公司实际保证金比例。
+MARGIN_RATIOS = MARGIN_RATIOS_BROKER
 
 RISK_PARITY_ASSET_CLASSES = {
     '股票': ['红利低波ETF'],
@@ -176,49 +194,18 @@ def normalize_index_signal(signal):
     return min(float(signal), 1.0)
 
 
-def annualized_vol(ret_series):
-    clean = ret_series.dropna()
-    if len(clean) < 20:
-        return np.nan
-    return clean.std() * np.sqrt(252)
+def allocate_index_futures(signal, assets, listing_dates, rebalance_date):
+    target = pd.Series(0.0, index=assets)
+    total_weight = INDEX_BASE_WEIGHT * normalize_index_signal(signal)
+    if total_weight <= 0:
+        return target
 
-
-def get_listed_index_futures(assets, listing_dates, rebalance_date):
-    return [
+    listed_index_futures = [
         asset for asset in INDEX_FUTURES
         if asset in assets
         and listing_dates.get(asset) is not None
         and listing_dates[asset] <= rebalance_date
     ]
-
-
-def calculate_index_equal_return(df_weight, listed_index_futures, end_date):
-    if not listed_index_futures:
-        return pd.Series(dtype=float)
-    return df_weight.loc[:end_date, listed_index_futures].tail(INDEX_VOL_WINDOW).mean(axis=1)
-
-
-def calculate_desired_index_weight(signal, df_weight, listed_index_futures, rebalance_date):
-    signal_scale = normalize_index_signal(signal)
-    if signal_scale <= 0 or not listed_index_futures:
-        return 0.0, np.nan, 0.0
-
-    base_target = INDEX_BASE_WEIGHT * signal_scale
-    index_ret = calculate_index_equal_return(df_weight, listed_index_futures, rebalance_date)
-    index_vol = annualized_vol(index_ret)
-    if pd.isna(index_vol) or index_vol <= 0:
-        return base_target, index_vol, 1.0
-
-    vol_scale = min(1.0, INDEX_VOL_TARGET / index_vol)
-    return base_target * vol_scale, index_vol, vol_scale
-
-
-def allocate_index_futures(total_weight, assets, listing_dates, rebalance_date):
-    target = pd.Series(0.0, index=assets)
-    if total_weight <= 0:
-        return target
-
-    listed_index_futures = get_listed_index_futures(assets, listing_dates, rebalance_date)
     if not listed_index_futures:
         return target
 
@@ -307,14 +294,7 @@ def main():
         if len(look) < 150:
             continue
 
-        listed_index_futures = get_listed_index_futures(assets, listing_dates, reb)
-        desired_index_weight, index_realized_vol, index_vol_scale = calculate_desired_index_weight(
-            raw_signal,
-            df_weight,
-            listed_index_futures,
-            reb
-        )
-        index_target = allocate_index_futures(desired_index_weight, assets, listing_dates, reb)
+        index_target = allocate_index_futures(raw_signal, assets, listing_dates, reb)
         index_weight = float(index_target.sum())
         remaining_weight = max(0.0, 1.0 - index_weight)
 
@@ -345,10 +325,6 @@ def main():
                     'date': reb,
                     '策略名称': STRATEGY_NAME,
                     '股指期货信号': float(raw_signal),
-                    '股指基准仓位': INDEX_BASE_WEIGHT * normalize_index_signal(raw_signal),
-                    '股指目标波动': INDEX_VOL_TARGET,
-                    '股指实现波动': index_realized_vol,
-                    '股指波动缩放系数': index_vol_scale,
                     '股指期货仓位': index_weight,
                     **{a: target.loc[a] for a in assets}
                 })
@@ -410,10 +386,7 @@ def main():
 
     print("\n正在生成周度仓位明细...")
     df_weights_all = pd.DataFrame(weight_recs)
-    weight_cols = [
-        'date', '策略名称', '股指期货信号', '股指基准仓位',
-        '股指目标波动', '股指实现波动', '股指波动缩放系数', '股指期货仓位'
-    ] + assets
+    weight_cols = ['date', '策略名称', '股指期货信号', '股指期货仓位'] + assets
     df_weights_all = df_weights_all[weight_cols]
     weights_filename = WEIGHTS_DIR / f'策略周度仓位明细_v{VERSION}.csv'
     df_weights_all.to_csv(str(weights_filename), index=False, encoding='utf-8-sig')

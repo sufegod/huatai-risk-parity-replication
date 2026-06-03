@@ -26,6 +26,9 @@ FILE_PATH_WEIGHT_RETURNS = PROJECT_DIR / '数据' / '日度收益数据更新' /
 FILE_PATH_TRADE_RETURNS = PROJECT_DIR / '数据' / '日度收益数据更新' / '日涨跌幅_未填充.csv'
 FILE_PATH_INDEX_SIGNAL = PROJECT_DIR / '数据' / '原始数据' / '股指期货信号.xlsx'
 METRICS_DIR = BACKTEST_DIR / '回测指标'
+NAV_DIR = METRICS_DIR / '净值'
+PERFORMANCE_DIR = METRICS_DIR / '指标'
+WEIGHTS_DIR = METRICS_DIR / '仓位明细'
 CHART_DIR = BACKTEST_DIR / '回测图表'
 
 MONTH_END_FREQ = 'M'
@@ -190,6 +193,9 @@ def allocate_index_futures(signal, assets, listing_dates, rebalance_date):
 def main():
     print(f"正在执行回测框架 v{VERSION}...")
     METRICS_DIR.mkdir(exist_ok=True)
+    NAV_DIR.mkdir(exist_ok=True)
+    PERFORMANCE_DIR.mkdir(exist_ok=True)
+    WEIGHTS_DIR.mkdir(exist_ok=True)
     CHART_DIR.mkdir(exist_ok=True)
 
     df_weight_raw = load_returns_csv(FILE_PATH_WEIGHT_RETURNS)
@@ -314,7 +320,7 @@ def main():
     print("正在生成每日净值数据...")
     df_navs = pd.DataFrame(index=df_trade.loc[first_date:].index)
     df_navs[STRATEGY_NAME] = (1 + ret_series.loc[first_date:]).cumprod()
-    navs_filename = METRICS_DIR / f'策略每日净值走势_v{VERSION}.csv'
+    navs_filename = NAV_DIR / f'策略每日净值走势_v{VERSION}.csv'
     df_navs.to_csv(str(navs_filename), encoding='utf-8-sig')
 
     print("正在计算年度与全局指标...")
@@ -347,7 +353,7 @@ def main():
     cols_order = [c for c in cols_order if c in df_m_all.columns]
     df_m_all = df_m_all[cols_order]
 
-    metrics_filename = METRICS_DIR / f'年度及全局回测指标_v{VERSION}.csv'
+    metrics_filename = PERFORMANCE_DIR / f'年度及全局回测指标_v{VERSION}.csv'
     df_m_all.to_csv(str(metrics_filename), index=False, encoding='utf-8-sig')
 
     print("\n[全局回测总览]")
@@ -358,7 +364,7 @@ def main():
     df_weights_all = pd.DataFrame(weight_recs)
     weight_cols = ['date', '策略名称', '股指期货信号', '股指期货仓位'] + assets
     df_weights_all = df_weights_all[weight_cols]
-    weights_filename = METRICS_DIR / f'策略周度仓位明细_v{VERSION}.csv'
+    weights_filename = WEIGHTS_DIR / f'策略周度仓位明细_v{VERSION}.csv'
     df_weights_all.to_csv(str(weights_filename), index=False, encoding='utf-8-sig')
 
     print(f"\n数据文件已生成：\n 1. {navs_filename}\n 2. {metrics_filename}\n 3. {weights_filename}")
