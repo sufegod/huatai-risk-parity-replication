@@ -27,13 +27,19 @@ python -m unittest discover -s tests
 python 策略复现与回测\每日更新策略\daily_update_strategy.py --skip-data-update
 ```
 
-生成最新数据并运行每日策略：
+生成最新数据并运行每日策略时，默认使用沙箱外 PowerShell 入口，避免 SQL Server ODBC 握手在沙箱内失败：
 
 ```powershell
-python 策略复现与回测\每日更新策略\daily_update_strategy.py --data-end-date 2026-05-28
+powershell -ExecutionPolicy Bypass -File .\策略复现与回测\每日更新策略\run_daily_update.ps1 -DataEndDate 2026-05-28
 ```
 
 不指定 `--data-end-date` 时，数据更新脚本会尝试使用各数据源共同可得的最新日期。
+
+单独测试数据更新链路时也使用同样的沙箱外入口：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\数据\日度收益数据更新\run_data_update.ps1 -EndDate 2026-05-28 -DryRun
+```
 
 ## 目录结构
 

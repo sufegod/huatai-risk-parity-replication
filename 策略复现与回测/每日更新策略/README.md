@@ -27,22 +27,22 @@ git check-ignore -v .env
 - `JYDB_DATABASE`：数据库名，默认 `JYDB`。
 - `JYDB_UID`：数据库用户名。
 - `JYDB_PWD`：数据库密码。
-默认运行：
+默认运行。需要访问数据库时，使用沙箱外 PowerShell 入口：
 
 ```powershell
-python 策略复现与回测\每日更新策略\daily_update_strategy.py
+powershell -ExecutionPolicy Bypass -File .\策略复现与回测\每日更新策略\run_daily_update.ps1
 ```
 
 指定数据更新截止日：
 
 ```powershell
-python 策略复现与回测\每日更新策略\daily_update_strategy.py --data-end-date 2026-05-28
+powershell -ExecutionPolicy Bypass -File .\策略复现与回测\每日更新策略\run_daily_update.ps1 -DataEndDate 2026-05-28
 ```
 
 兼容旧命令行参数时：
 
 ```powershell
-python 策略复现与回测\每日更新策略\daily_update_strategy.py --data-end-date 2026-05-28 --force-observation
+powershell -ExecutionPolicy Bypass -File .\策略复现与回测\每日更新策略\run_daily_update.ps1 -DataEndDate 2026-05-28 -ForceObservation
 ```
 
 v0.18 日频调仓下，策略数据日期本身就是观察日，通常不需要使用 `--force-observation`。
@@ -56,7 +56,7 @@ python 策略复现与回测\每日更新策略\daily_update_strategy.py --skip-
 单独测试数据更新链路：
 
 ```powershell
-python 数据\日度收益数据更新\日度收益数据更新.py --end-date 2026-05-28 --dry-run
+powershell -ExecutionPolicy Bypass -File .\数据\日度收益数据更新\run_data_update.ps1 -EndDate 2026-05-28 -DryRun
 ```
 
 不要把真实数据库密码写入 README、提交信息、issue、PR 或日志。`.env` 只用于线下分发和本地运行。
