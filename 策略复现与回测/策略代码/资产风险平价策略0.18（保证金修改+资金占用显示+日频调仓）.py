@@ -33,6 +33,7 @@ CHART_DIR = BACKTEST_DIR / '回测图表'
 
 MONTH_END_FREQ = 'M'
 WEEKLY_REBALANCE_FREQ = 'W-FRI'
+REBALANCE_MODE = 'daily'
 FEE_RATE = 0.0005
 REPO_FEE_RATE = 0.000001
 EWMA_DECAY = 0.97
@@ -188,7 +189,12 @@ def load_index_signal(file_path):
     return df.loc[first_valid:, 'signal'].ffill()
 
 
-def get_weekly_observation_dates(index):
+def get_observation_dates(index, rebalance_mode=REBALANCE_MODE):
+    if rebalance_mode == 'daily':
+        return pd.DatetimeIndex(index)
+    if rebalance_mode != 'weekly':
+        raise ValueError("rebalance_mode must be 'weekly' or 'daily'")
+
     observations = []
     date_series = pd.Series(index=index, data=index)
     for _, group in date_series.groupby(pd.Grouper(freq=WEEKLY_REBALANCE_FREQ)):
@@ -224,7 +230,7 @@ def allocate_index_futures(signal, assets, listing_dates, rebalance_date):
 
 # ================= 主流程 =================
 def main():
-    print(f"正在执行回测框架 v{VERSION}...")
+    print(f"正在执行回测框架 v{VERSION}（日频调仓）...")
     METRICS_DIR.mkdir(exist_ok=True)
     NAV_DIR.mkdir(exist_ok=True)
     PERFORMANCE_DIR.mkdir(exist_ok=True)
@@ -273,7 +279,7 @@ def main():
     repo_net_yield = np.maximum((repo_shifted / 365.0) * calendar_days - REPO_FEE_RATE, 0.0)
 
     m_ratios = pd.Series({a: MARGIN_RATIOS.get(a, 1.0) for a in assets})
-    week_ends = get_weekly_observation_dates(df_trade.index)
+    observation_dates = get_observation_dates(df_trade.index)
 
     ret_series = pd.Series(0.0, index=df_trade.index)
     margin_series = pd.Series(0.0, index=df_trade.index)
@@ -283,27 +289,27 @@ def main():
     curr_margin = 0.0
     first_date = None
 
-    for i in range(len(week_ends) - 1):
-        reb = week_ends[i]
-        if reb < first_signal_date:
+    for i in range(len(observation_dates) - 1):
+        rebalance_date = observation_dates[i]
+        if rebalance_date < first_signal_date:
             continue
 
-        raw_signal = signal_on_trade_dates.loc[reb]
+        raw_signal = signal_on_trade_dates.loc[rebalance_date]
         if pd.isna(raw_signal):
             continue
 
         eligible_rp_assets = [
             asset for asset in risk_parity_assets
-            if listing_dates.get(asset) is not None and listing_dates[asset] <= reb
+            if listing_dates.get(asset) is not None and listing_dates[asset] <= rebalance_date
         ]
         if len(eligible_rp_assets) == 0:
             continue
 
-        look = df_weight.loc[reb - pd.DateOffset(months=12):reb, eligible_rp_assets]
+        look = df_weight.loc[rebalance_date - pd.DateOffset(months=12):rebalance_date, eligible_rp_assets]
         if len(look) < 150:
             continue
 
-        index_target = allocate_index_futures(raw_signal, assets, listing_dates, reb)
+        index_target = allocate_index_futures(raw_signal, assets, listing_dates, rebalance_date)
         index_weight = float(index_target.sum())
         remaining_weight = max(0.0, 1.0 - index_weight)
 
@@ -312,16 +318,16 @@ def main():
         target.loc[index_target.index] = index_target
         target.loc[eligible_rp_assets] = rp_active * remaining_weight
 
-        next_week = df_trade.loc[reb + pd.Timedelta(days=1):week_ends[i + 1]]
-        if len(next_week) == 0:
+        holding_period = df_trade.loc[rebalance_date + pd.Timedelta(days=1):observation_dates[i + 1]]
+        if len(holding_period) == 0:
             continue
         if first_date is None:
-            first_date = next_week.index[0]
+            first_date = holding_period.index[0]
 
-        for date, dr in next_week.iterrows():
+        for date, dr in holding_period.iterrows():
             daily_repo = repo_net_yield.loc[date]
 
-            if date == next_week.index[0]:
+            if date == holding_period.index[0]:
                 new_margin = (target * m_ratios).sum()
                 idle_cash = max(0.0, 1.0 - new_margin)
                 idle_return = idle_cash * daily_repo
@@ -331,7 +337,7 @@ def main():
 
                 curr_w = target.copy()
                 weight_recs.append({
-                    'date': reb,
+                    'date': rebalance_date,
                     '策略名称': STRATEGY_NAME,
                     '股指期货信号': float(raw_signal),
                     '股指期货仓位': index_weight,
@@ -396,11 +402,11 @@ def main():
     print(df_m_all[(df_m_all['回测区间'] == '全局 (Total)') & (df_m_all['组合/资产'] == STRATEGY_NAME)].set_index(
         '组合/资产').to_string())
 
-    print("\n正在生成周度仓位明细...")
+    print("\n正在生成日度仓位明细...")
     df_weights_all = pd.DataFrame(weight_recs)
     weight_cols = ['date', '策略名称', '股指期货信号', '股指期货仓位'] + assets + ['资金占用比例']
     df_weights_all = df_weights_all[weight_cols]
-    weights_filename = WEIGHTS_DIR / f'策略周度仓位明细_v{VERSION}.csv'
+    weights_filename = WEIGHTS_DIR / f'策略日度仓位明细_v{VERSION}.csv'
     df_weights_all.to_csv(str(weights_filename), index=False, encoding='utf-8-sig')
 
     print(f"\n数据文件已生成：\n 1. {navs_filename}\n 2. {metrics_filename}\n 3. {weights_filename}")
@@ -430,7 +436,7 @@ def main():
         alpha=0.8,
         colors=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
     )
-    axes[1].set_title('周度大类资产权重', fontsize=14)
+    axes[1].set_title('日度大类资产权重', fontsize=14)
     axes[1].set_ylim(0, 1)
     axes[1].yaxis.set_major_formatter(ticker.PercentFormatter(1.0))
     axes[1].legend(loc='upper left')

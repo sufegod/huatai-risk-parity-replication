@@ -18,14 +18,13 @@ BACKTEST_DIR = PROJECT_ROOT / "策略复现与回测"
 SCRIPT_DIR = BACKTEST_DIR / "每日更新策略"
 
 DATA_UPDATE_SCRIPT = PROJECT_ROOT / "数据" / "日度收益数据更新" / "日度收益数据更新.py"
-STRATEGY_SCRIPT = BACKTEST_DIR / "策略代码" / "资产风险平价策略0.18（保证金修改+资金占用显示）.py"
+STRATEGY_SCRIPT = BACKTEST_DIR / "策略代码" / "资产风险平价策略0.18（保证金修改+资金占用显示+日频调仓）.py"
 OUTPUT_DIR = SCRIPT_DIR / "输出"
 
 WEIGHT_RETURNS_PATH = PROJECT_ROOT / "数据" / "日度收益数据更新" / "日涨跌幅_填充.csv"
 TRADE_RETURNS_PATH = PROJECT_ROOT / "数据" / "日度收益数据更新" / "日涨跌幅_未填充.csv"
 INDEX_SIGNAL_PATH = PROJECT_ROOT / "数据" / "原始数据" / "股指期货信号.xlsx"
-
-WEEKLY_REBALANCE_FREQ = "W-FRI"
+REBALANCE_MODE = "daily"
 
 
 @dataclass(frozen=True)
@@ -52,7 +51,7 @@ class BacktestResult:
     assets: list[str]
     df_navs: pd.DataFrame
     df_metrics: pd.DataFrame
-    df_weekly_weights: pd.DataFrame
+    df_daily_weights: pd.DataFrame
     df_trade: pd.DataFrame | None = None
 
 
@@ -74,7 +73,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="先更新日度数据，再生成v0.18每日策略仓位报告")
     parser.add_argument("--data-end-date", help="传递给每日数据更新脚本的结束日期")
     parser.add_argument("--skip-data-update", action="store_true", help="跳过每日数据更新，仅基于现有CSV生成报告")
-    parser.add_argument("--force-observation", action="store_true", help="强制将策略数据日期作为周度观察日")
+    parser.add_argument("--force-observation", action="store_true", help="兼容旧参数；日频调仓下策略数据日期本身即观察日")
     return parser.parse_args(argv)
 
 
@@ -102,22 +101,17 @@ def output_paths(output_dir: Path, as_of_date: pd.Timestamp) -> dict[str, Path]:
         "positions": output_dir / "仓位" / f"仓位_{suffix}.csv",
         "nav": output_dir / "净值" / f"策略每日净值走势_{suffix}.csv",
         "metrics": output_dir / "指标" / f"年度及全局回测指标_{suffix}.csv",
-        "weekly_weights": output_dir / "仓位明细" / f"策略周度仓位明细_{suffix}.csv",
+        "daily_weights": output_dir / "仓位明细" / f"策略日度仓位明细_{suffix}.csv",
         "chart": output_dir / "图表" / f"回测图表_{suffix}.png",
         "report": output_dir / "报告" / f"回测报告_{suffix}.md",
     }
 
 
-def get_weekly_observation_dates(index: pd.DatetimeIndex) -> pd.DatetimeIndex:
-    observations = []
-    date_series = pd.Series(index=index, data=index)
-    for _, group in date_series.groupby(pd.Grouper(freq=WEEKLY_REBALANCE_FREQ)):
-        if len(group) > 0:
-            observations.append(group.index[-1])
-    return pd.DatetimeIndex(observations)
+def get_observation_dates(index: pd.DatetimeIndex) -> pd.DatetimeIndex:
+    return pd.DatetimeIndex(index)
 
 
-def weekly_weight_columns(assets: list[str]) -> list[str]:
+def daily_weight_columns(assets: list[str]) -> list[str]:
     return ["date", "策略名称", "股指期货信号", "股指期货仓位"] + assets + ["资金占用比例"]
 
 
@@ -136,17 +130,7 @@ def select_observation_date(
         raise ValueError(f"没有不晚于 {as_of_date:%Y-%m-%d} 的交易收益数据")
 
     actual_as_of = pd.Timestamp(available_index[-1]).normalize()
-    if force_observation or actual_as_of.weekday() == 4:
-        return ObservationSelection(actual_as_of, True)
-
-    week_ends = get_weekly_observation_dates(available_index)
-    if len(week_ends) == 0:
-        raise ValueError("没有可用周度观察日")
-    if week_ends[-1].normalize() == actual_as_of:
-        week_ends = week_ends[:-1]
-    if len(week_ends) == 0:
-        raise ValueError("当前日期之前没有已完成的周度观察日")
-    return ObservationSelection(pd.Timestamp(week_ends[-1]).normalize(), False)
+    return ObservationSelection(actual_as_of, True)
 
 
 def validate_returns_frame(df: pd.DataFrame, required_columns: list[str], label: str) -> None:
@@ -231,7 +215,7 @@ def compute_target_for_observation(
 def find_valid_target(
     strategy,
     selection: ObservationSelection,
-    week_ends: pd.DatetimeIndex,
+    observation_dates: pd.DatetimeIndex,
     assets: list[str],
     risk_parity_assets: list[str],
     df_weight: pd.DataFrame,
@@ -252,7 +236,7 @@ def find_valid_target(
         )
         return selection.observation_date, target, raw_signal, index_weight
 
-    candidates = [pd.Timestamp(date).normalize() for date in week_ends if date <= selection.observation_date]
+    candidates = [pd.Timestamp(date).normalize() for date in observation_dates if date <= selection.observation_date]
     for candidate in reversed(candidates):
         try:
             target, raw_signal, index_weight = compute_target_for_observation(
@@ -268,7 +252,7 @@ def find_valid_target(
             return candidate, target, raw_signal, index_weight
         except ValueError:
             continue
-    raise ValueError("没有可用的历史周度目标仓位")
+    raise ValueError("没有可用的历史日度目标仓位")
 
 
 def build_target_report(force_observation: bool = False) -> TargetReport:
@@ -297,11 +281,11 @@ def build_target_report(force_observation: bool = False) -> TargetReport:
         raise ValueError("股指期货信号文件没有有效信号")
 
     selection = select_observation_date(df_trade.index, as_of_date, force_observation)
-    week_ends = get_weekly_observation_dates(df_trade.index[df_trade.index <= selection.observation_date])
+    observation_dates = get_observation_dates(df_trade.index[df_trade.index <= selection.observation_date])
     observation_date, target, raw_signal, index_weight = find_valid_target(
         strategy,
         selection,
-        week_ends,
+        observation_dates,
         assets,
         risk_parity_assets,
         df_weight,
@@ -349,7 +333,7 @@ def build_backtest_result() -> BacktestResult:
     repo_net_yield = np.maximum((repo_shifted / 365.0) * calendar_days - strategy.REPO_FEE_RATE, 0.0)
 
     m_ratios = pd.Series({asset: strategy.MARGIN_RATIOS.get(asset, 1.0) for asset in assets})
-    week_ends = get_weekly_observation_dates(df_trade.index)
+    observation_dates = get_observation_dates(df_trade.index)
 
     ret_series = pd.Series(0.0, index=df_trade.index)
     margin_series = pd.Series(0.0, index=df_trade.index)
@@ -359,28 +343,28 @@ def build_backtest_result() -> BacktestResult:
     curr_margin = 0.0
     first_date = None
 
-    for i in range(len(week_ends) - 1):
-        reb = week_ends[i]
-        if reb < first_signal_date:
+    for i in range(len(observation_dates) - 1):
+        rebalance_date = observation_dates[i]
+        if rebalance_date < first_signal_date:
             continue
 
-        raw_signal = signal_on_trade_dates.loc[reb]
+        raw_signal = signal_on_trade_dates.loc[rebalance_date]
         if pd.isna(raw_signal):
             continue
 
         eligible_rp_assets = [
             asset
             for asset in risk_parity_assets
-            if listing_dates.get(asset) is not None and listing_dates[asset] <= reb
+            if listing_dates.get(asset) is not None and listing_dates[asset] <= rebalance_date
         ]
         if len(eligible_rp_assets) == 0:
             continue
 
-        lookback = df_weight.loc[reb - pd.DateOffset(months=12) : reb, eligible_rp_assets]
+        lookback = df_weight.loc[rebalance_date - pd.DateOffset(months=12) : rebalance_date, eligible_rp_assets]
         if len(lookback) < 150:
             continue
 
-        index_target = strategy.allocate_index_futures(raw_signal, assets, listing_dates, reb)
+        index_target = strategy.allocate_index_futures(raw_signal, assets, listing_dates, rebalance_date)
         index_weight = float(index_target.sum())
         remaining_weight = max(0.0, 1.0 - index_weight)
 
@@ -389,16 +373,16 @@ def build_backtest_result() -> BacktestResult:
         target.loc[index_target.index] = index_target
         target.loc[eligible_rp_assets] = rp_active * remaining_weight
 
-        next_week = df_trade.loc[reb + pd.Timedelta(days=1) : week_ends[i + 1]]
-        if len(next_week) == 0:
+        holding_period = df_trade.loc[rebalance_date + pd.Timedelta(days=1) : observation_dates[i + 1]]
+        if len(holding_period) == 0:
             continue
         if first_date is None:
-            first_date = next_week.index[0]
+            first_date = holding_period.index[0]
 
-        for date, daily_return in next_week.iterrows():
+        for date, daily_return in holding_period.iterrows():
             daily_repo = repo_net_yield.loc[date]
 
-            if date == next_week.index[0]:
+            if date == holding_period.index[0]:
                 new_margin = (target * m_ratios).sum()
                 idle_cash = max(0.0, 1.0 - new_margin)
                 idle_return = idle_cash * daily_repo
@@ -409,7 +393,7 @@ def build_backtest_result() -> BacktestResult:
                 curr_w = target.copy()
                 weight_recs.append(
                     {
-                        "date": reb,
+                        "date": rebalance_date,
                         "策略名称": strategy.STRATEGY_NAME,
                         "股指期货信号": float(raw_signal),
                         "股指期货仓位": index_weight,
@@ -464,9 +448,9 @@ def build_backtest_result() -> BacktestResult:
     cols_order = [col for col in cols_order if col in df_metrics.columns]
     df_metrics = df_metrics[cols_order]
 
-    df_weekly_weights = pd.DataFrame(weight_recs)
-    weight_cols = weekly_weight_columns(assets)
-    df_weekly_weights = df_weekly_weights[weight_cols]
+    df_daily_weights = pd.DataFrame(weight_recs)
+    weight_cols = daily_weight_columns(assets)
+    df_daily_weights = df_daily_weights[weight_cols]
 
     return BacktestResult(
         as_of_date=as_of_date,
@@ -474,7 +458,7 @@ def build_backtest_result() -> BacktestResult:
         assets=assets,
         df_navs=df_navs,
         df_metrics=df_metrics,
-        df_weekly_weights=df_weekly_weights,
+        df_daily_weights=df_daily_weights,
         df_trade=df_trade,
     )
 
@@ -487,7 +471,7 @@ def build_position_dataframe(report: TargetReport) -> pd.DataFrame:
         rows.append(
             {
                 "日期": report.as_of_date.strftime("%Y-%m-%d"),
-                "观察日": report.observation_date.strftime("%Y-%m-%d"),
+                "仓位来源观察日": report.observation_date.strftime("%Y-%m-%d"),
                 "报告类型": report_type,
                 "是否新调仓": report.is_new_observation,
                 "股指期货信号": report.raw_signal,
@@ -539,7 +523,8 @@ def build_summary_markdown(
         "",
         f"- 策略数据日期：`{report.as_of_date:%Y-%m-%d}`",
         f"- 回测区间：`{backtest_result.first_date:%Y-%m-%d}` 至 `{latest_date:%Y-%m-%d}`",
-        f"- 观察日：`{report.observation_date:%Y-%m-%d}`",
+        f"- 日报观察日：`{report.as_of_date:%Y-%m-%d}`",
+        f"- 仓位来源观察日：`{report.observation_date:%Y-%m-%d}`",
         f"- 报告类型：`{report_type}`",
         f"- 股指期货信号：`{report.raw_signal:.4f}`",
         f"- 股指期货仓位：`{report.index_weight:.2%}`",
@@ -583,7 +568,7 @@ def build_summary_markdown(
             f"| 仓位 | `{paths['positions']}` |",
             f"| 净值 | `{paths['nav']}` |",
             f"| 指标 | `{paths['metrics']}` |",
-            f"| 周度仓位明细 | `{paths['weekly_weights']}` |",
+            f"| 日度仓位明细 | `{paths['daily_weights']}` |",
             f"| 图表 | `{paths['chart']}` |",
             f"| 报告 | `{paths['report']}` |",
         ]
@@ -594,7 +579,7 @@ def build_summary_markdown(
 def render_backtest_chart(backtest_result: BacktestResult, chart_path: Path) -> None:
     strategy = load_strategy_module()
     df_navs = backtest_result.df_navs
-    df_weekly_weights = backtest_result.df_weekly_weights
+    df_daily_weights = backtest_result.df_daily_weights
     df_trade = backtest_result.df_trade
     first_date = backtest_result.first_date
     assets = backtest_result.assets
@@ -610,7 +595,7 @@ def render_backtest_chart(backtest_result: BacktestResult, chart_path: Path) -> 
     axes[0].legend(loc="upper left")
     axes[0].grid(True, ls="--", alpha=0.5)
 
-    df_weights = df_weekly_weights.set_index("date")
+    df_weights = df_daily_weights.set_index("date")
     df_classes = pd.DataFrame(
         {
             class_name: df_weights[[asset for asset in class_assets if asset in assets]].sum(axis=1)
@@ -624,7 +609,7 @@ def render_backtest_chart(backtest_result: BacktestResult, chart_path: Path) -> 
         alpha=0.8,
         colors=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"],
     )
-    axes[1].set_title("周度大类资产权重", fontsize=14)
+    axes[1].set_title("日度大类资产权重", fontsize=14)
     axes[1].set_ylim(0, 1)
     axes[1].yaxis.set_major_formatter(ticker.PercentFormatter(1.0))
     axes[1].legend(loc="upper left")
@@ -657,7 +642,7 @@ def write_report(
     positions.to_csv(paths["positions"], index=False, encoding="utf-8-sig", float_format="%.10f")
     backtest_result.df_navs.to_csv(paths["nav"], encoding="utf-8-sig")
     backtest_result.df_metrics.to_csv(paths["metrics"], index=False, encoding="utf-8-sig")
-    backtest_result.df_weekly_weights.to_csv(paths["weekly_weights"], index=False, encoding="utf-8-sig")
+    backtest_result.df_daily_weights.to_csv(paths["daily_weights"], index=False, encoding="utf-8-sig")
     if render_chart:
         render_backtest_chart(backtest_result, paths["chart"])
     else:

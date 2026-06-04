@@ -11,7 +11,7 @@ SCRIPT_PATH = (
     PROJECT_ROOT
     / "策略复现与回测"
     / "策略代码"
-    / "资产风险平价策略0.18（保证金修改+资金占用显示）.py"
+    / "资产风险平价策略0.18（保证金修改+资金占用显示+日频调仓）.py"
 )
 DOC_PATH = PROJECT_ROOT / "策略复现与回测" / "策略版本说明" / "v0.18策略版本说明.md"
 
@@ -71,7 +71,17 @@ class StrategyV018MarginRatioTests(unittest.TestCase):
 
         self.assertIn("国泰君安期货当前的实际保证金", note)
         self.assertIn("过去的实际情况可能存在差异", note)
-        self.assertIn("资产风险平价策略0.18（保证金修改+资金占用显示）.py", note)
+        self.assertIn("资产风险平价策略0.18（保证金修改+资金占用显示+日频调仓）.py", note)
+        self.assertIn("日频调仓", note)
+
+    def test_get_observation_dates_defaults_to_daily_trade_dates(self):
+        module = load_script_module()
+        dates = pd.to_datetime(["2026-05-18", "2026-05-19", "2026-05-21"])
+
+        result = module.get_observation_dates(pd.DatetimeIndex(dates))
+
+        self.assertEqual(result.tolist(), list(dates))
+        self.assertEqual(module.REBALANCE_MODE, "daily")
 
     def test_calculate_metrics_outputs_average_margin_usage(self):
         module = load_script_module()
