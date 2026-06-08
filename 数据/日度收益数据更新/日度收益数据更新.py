@@ -27,15 +27,20 @@ CACHE_DIR = SCRIPT_DIR / "增量缓存"
 FUTURES_QUOTE_CACHE = "期货行情.csv"
 ETF_QUOTE_CACHE = "红利低波ETF行情.csv"
 GC001_CACHE = "GC001.csv"
+CSI1000_INDEX_QUOTE_CACHE = "中证1000指数行情.csv"
 
 UNUSED_COLUMNS = {"有色ETF", "能源化工ETF", "布油连续"}
 REPO_COLUMN = "一天期国债逆回购"
 ETF_COLUMN = "红利低波ETF"
 ETF_INNER_CODE = 201577
+CSI500_FUTURES_COLUMN = "中证500主连"
+CSI1000_INDEX_COLUMN = "中证1000指数"
+CSI1000_INDEX_INNER_CODE = 39144
 
 FUTURES_CACHE_COLUMNS = ["资产", "来源", "日期", "合约内部编码", "合约代码", "收盘价", "主力标志"]
 ETF_CACHE_COLUMNS = ["日期", "PrevClosePrice", "ClosePrice"]
 GC001_CACHE_COLUMNS = ["日期", REPO_COLUMN]
+INDEX_QUOTE_CACHE_COLUMNS = ["日期", "PrevClosePrice", "ClosePrice", "ChangePCT"]
 
 
 @dataclass(frozen=True)
@@ -63,6 +68,7 @@ FUTURES_ASSETS = [
     FuturesAsset("沪金主连", "commodity", 10, 313),
     FuturesAsset("豆粕主连", "commodity", 13, 345),
     FuturesAsset("中证1000主连", "financial", 20, 39144),
+    FuturesAsset(CSI500_FUTURES_COLUMN, "financial", 20, 4978),
     FuturesAsset("30年国债主连", "financial", 20, 504),
     FuturesAsset("沪铜主连", "commodity", 10, 305),
     FuturesAsset("沪铝主连", "commodity", 10, 310),
@@ -76,6 +82,7 @@ OUTPUT_COLUMNS = [
     "沪金主连",
     "豆粕主连",
     "中证1000主连",
+    CSI500_FUTURES_COLUMN,
     "30年国债主连",
     ETF_COLUMN,
     REPO_COLUMN,
@@ -124,7 +131,7 @@ def prune_output_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df.loc[:, kept].copy()
 
 
-def compute_return_from_prev_close(quotes: pd.DataFrame) -> pd.Series:
+def compute_return_from_prev_close(quotes: pd.DataFrame, series_name: str = ETF_COLUMN) -> pd.Series:
     df = quotes.copy()
     df["日期"] = pd.to_datetime(df["日期"]).dt.normalize()
     close = pd.to_numeric(df["ClosePrice"], errors="coerce")
@@ -133,7 +140,7 @@ def compute_return_from_prev_close(quotes: pd.DataFrame) -> pd.Series:
     returns[(prev_close == 0) | prev_close.isna()] = pd.NA
     returns.index = df["日期"]
     returns = returns.sort_index()
-    returns.name = ETF_COLUMN
+    returns.name = series_name
     return returns
 
 
@@ -218,6 +225,20 @@ def normalize_gc001_cache(df: pd.DataFrame) -> pd.DataFrame:
     return result.loc[:, GC001_CACHE_COLUMNS].sort_values("日期").reset_index(drop=True)
 
 
+def normalize_index_quote_cache(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return _empty_frame(INDEX_QUOTE_CACHE_COLUMNS)
+    result = _normalize_date_column(df)
+    for column in INDEX_QUOTE_CACHE_COLUMNS:
+        if column not in result.columns:
+            result[column] = pd.NA
+    result["PrevClosePrice"] = pd.to_numeric(result["PrevClosePrice"], errors="coerce")
+    result["ClosePrice"] = pd.to_numeric(result["ClosePrice"], errors="coerce")
+    result["ChangePCT"] = pd.to_numeric(result["ChangePCT"], errors="coerce")
+    result = result.dropna(subset=["日期"])
+    return result.loc[:, INDEX_QUOTE_CACHE_COLUMNS].sort_values("日期").reset_index(drop=True)
+
+
 def read_futures_quote_cache(path: Path | None = None, missing_ok: bool = False) -> pd.DataFrame:
     cache_path = path or _cache_path(FUTURES_QUOTE_CACHE)
     if not cache_path.exists():
@@ -245,6 +266,15 @@ def read_gc001_cache(path: Path | None = None, missing_ok: bool = False) -> pd.D
     return normalize_gc001_cache(pd.read_csv(cache_path, encoding="utf-8-sig"))
 
 
+def read_csi1000_index_quote_cache(path: Path | None = None, missing_ok: bool = False) -> pd.DataFrame:
+    cache_path = path or _cache_path(CSI1000_INDEX_QUOTE_CACHE)
+    if not cache_path.exists():
+        if missing_ok:
+            return _empty_frame(INDEX_QUOTE_CACHE_COLUMNS)
+        raise FileNotFoundError(f"找不到中证1000指数行情缓存: {cache_path}")
+    return normalize_index_quote_cache(pd.read_csv(cache_path, encoding="utf-8-sig"))
+
+
 def merge_cache_frames(
     existing: pd.DataFrame,
     incoming: pd.DataFrame,
@@ -265,6 +295,18 @@ def merge_cache_frames(
     if not result.empty:
         result = result.sort_values(sort_columns)
     return result.reset_index(drop=True)
+
+
+def normalize_datetime_index_frame(df: pd.DataFrame) -> pd.DataFrame:
+    result = df.copy()
+    if len(result.index) == 0:
+        result.index = pd.DatetimeIndex([])
+        return result
+    dates = pd.to_datetime(result.index, errors="coerce")
+    valid = ~pd.isna(dates)
+    result = result.loc[valid].copy()
+    result.index = pd.DatetimeIndex(dates[valid]).normalize()
+    return result.sort_index()
 
 
 def write_cache_csv(
@@ -444,10 +486,25 @@ WHERE thscode = '204001.SH'
     return pd.Timestamp(value).normalize()
 
 
+def fetch_csi1000_index_latest_date(conn: Any) -> pd.Timestamp | None:
+    sql = """
+SELECT MAX(TradingDay)
+FROM dbo.QT_IndexQuote
+WHERE InnerCode = ?
+  AND ClosePrice IS NOT NULL
+  AND PrevClosePrice IS NOT NULL
+"""
+    value = fetch_scalar(conn, sql, (CSI1000_INDEX_INNER_CODE,))
+    if value is None or pd.isna(value):
+        return None
+    return pd.Timestamp(value).normalize()
+
+
 def fetch_jydb_latest_end_date(conn: Any) -> pd.Timestamp:
     dates = [fetch_futures_latest_date(conn, asset) for asset in FUTURES_ASSETS]
     dates.append(fetch_etf_latest_date(conn))
     dates.append(fetch_gc001_latest_date(conn))
+    dates.append(fetch_csi1000_index_latest_date(conn))
     valid_dates = [date for date in dates if date is not None]
     if not valid_dates:
         raise RuntimeError("数据库没有可用最新日期")
@@ -569,8 +626,8 @@ def fetch_futures_returns(
             }
         )
 
-    returns_df = pd.DataFrame(returns_by_asset)
-    price_df = pd.DataFrame(prices_by_asset)
+    returns_df = normalize_datetime_index_frame(pd.DataFrame(returns_by_asset))
+    price_df = normalize_datetime_index_frame(pd.DataFrame(prices_by_asset))
     return returns_df, price_df, summary
 
 
@@ -611,7 +668,9 @@ def build_futures_outputs_from_cache(
             }
         )
 
-    return pd.DataFrame(returns_by_asset), pd.DataFrame(prices_by_asset), summary
+    returns_df = normalize_datetime_index_frame(pd.DataFrame(returns_by_asset))
+    price_df = normalize_datetime_index_frame(pd.DataFrame(prices_by_asset))
+    return returns_df, price_df, summary
 
 
 def build_etf_return_from_cache(cached_quotes: pd.DataFrame, start_date: pd.Timestamp, end_date: pd.Timestamp) -> pd.Series:
@@ -631,6 +690,18 @@ def build_gc001_from_cache(cached_gc001: pd.DataFrame, start_date: pd.Timestamp,
     series = series[~series.index.duplicated(keep="last")]
     series.name = REPO_COLUMN
     return series
+
+
+def build_csi1000_index_return_from_cache(
+    cached_quotes: pd.DataFrame,
+    start_date: pd.Timestamp,
+    end_date: pd.Timestamp,
+) -> pd.Series:
+    cache = normalize_index_quote_cache(cached_quotes)
+    cache = cache.loc[(cache["日期"] >= start_date) & (cache["日期"] <= end_date)]
+    if cache.empty:
+        return pd.Series(dtype="float64", name=CSI1000_INDEX_COLUMN)
+    return compute_return_from_prev_close(cache, CSI1000_INDEX_COLUMN)
 
 
 def fetch_etf_return(conn: Any, start_date: pd.Timestamp, end_date: pd.Timestamp) -> pd.Series:
@@ -674,6 +745,28 @@ ORDER BY time
     return normalize_gc001_cache(df)
 
 
+def fetch_csi1000_index_quote_rows(conn: Any, start_date: pd.Timestamp, end_date: pd.Timestamp) -> pd.DataFrame:
+    sql = """
+SELECT
+    TradingDay AS 日期,
+    CAST(PrevClosePrice AS float) AS PrevClosePrice,
+    CAST(ClosePrice AS float) AS ClosePrice,
+    CAST(ChangePCT AS float) AS ChangePCT
+FROM dbo.QT_IndexQuote
+WHERE InnerCode = ?
+  AND TradingDay BETWEEN ? AND ?
+ORDER BY TradingDay
+"""
+    df = fetch_dataframe(
+        conn,
+        sql,
+        (CSI1000_INDEX_INNER_CODE, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")),
+    )
+    if df.empty:
+        return _empty_frame(INDEX_QUOTE_CACHE_COLUMNS)
+    return normalize_index_quote_cache(df)
+
+
 def _date_text(value: pd.Timestamp | None) -> str:
     if value is None or pd.isna(value):
         return ""
@@ -699,6 +792,14 @@ def should_skip_fetch(cache: pd.DataFrame, target_end: pd.Timestamp, full_refres
     return latest is not None and target_end <= latest
 
 
+def futures_cache_has_all_configured_assets(cache: pd.DataFrame) -> bool:
+    if cache.empty or "资产" not in cache.columns:
+        return False
+    cached_assets = set(cache["资产"].dropna().astype(str))
+    required_assets = {asset.name for asset in FUTURES_ASSETS}
+    return required_assets.issubset(cached_assets)
+
+
 def refresh_futures_quote_cache(
     conn: Any,
     existing: pd.DataFrame,
@@ -709,10 +810,15 @@ def refresh_futures_quote_cache(
     dry_run: bool,
 ) -> tuple[pd.DataFrame, CacheUpdateStat]:
     existing = _empty_frame(FUTURES_CACHE_COLUMNS) if full_refresh else normalize_futures_quote_cache(existing)
-    if should_skip_fetch(existing, target_end, full_refresh):
+    has_all_assets = futures_cache_has_all_configured_assets(existing)
+    if has_all_assets and should_skip_fetch(existing, target_end, full_refresh):
         return existing, _skipped_stat("期货行情", existing, target_end)
 
-    query_start = calculate_incremental_start(existing, fallback_start, overlap_days, full_refresh)
+    query_start = (
+        calculate_incremental_start(existing, fallback_start, overlap_days, full_refresh)
+        if has_all_assets
+        else pd.Timestamp(fallback_start).normalize()
+    )
     incoming = fetch_futures_cache_rows(conn, query_start, target_end)
     merged = merge_cache_frames(
         existing,
@@ -789,18 +895,57 @@ def refresh_gc001_cache(
     )
 
 
+def refresh_csi1000_index_quote_cache(
+    conn: Any,
+    existing: pd.DataFrame,
+    fallback_start: pd.Timestamp,
+    target_end: pd.Timestamp,
+    overlap_days: int,
+    full_refresh: bool,
+    dry_run: bool,
+) -> tuple[pd.DataFrame, CacheUpdateStat]:
+    existing = _empty_frame(INDEX_QUOTE_CACHE_COLUMNS) if full_refresh else normalize_index_quote_cache(existing)
+    if should_skip_fetch(existing, target_end, full_refresh):
+        return existing, _skipped_stat("中证1000指数行情", existing, target_end)
+
+    query_start = calculate_incremental_start(existing, fallback_start, overlap_days, full_refresh)
+    incoming = fetch_csi1000_index_quote_rows(conn, query_start, target_end)
+    merged = merge_cache_frames(existing, incoming, key_columns=["日期"], sort_columns=["日期"])
+    merged = normalize_index_quote_cache(merged)
+    write_cache_csv(merged, _cache_path(CSI1000_INDEX_QUOTE_CACHE), INDEX_QUOTE_CACHE_COLUMNS, dry_run)
+    return merged, CacheUpdateStat(
+        source="中证1000指数行情",
+        previous_end=_date_text(cache_max_date(existing)),
+        query_start=query_start.strftime("%Y-%m-%d"),
+        query_end=target_end.strftime("%Y-%m-%d"),
+        fetched_rows=int(len(incoming)),
+        cache_rows=int(len(merged)),
+    )
+
+
 def build_outputs(
     official: pd.DataFrame,
     legacy_filled: pd.DataFrame,
     start_date: pd.Timestamp,
     end_date: pd.Timestamp,
+    csi1000_index_return: pd.Series | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     calendar = official.index.union(legacy_filled.index)
+    calendar = pd.DatetimeIndex(pd.to_datetime(calendar, errors="coerce"))
+    calendar = calendar[~pd.isna(calendar)]
     calendar = calendar[(calendar >= start_date) & (calendar <= end_date)].sort_values()
     official = official.reindex(calendar)
     official = official.reindex(columns=OUTPUT_COLUMNS)
 
     filled = official.copy()
+    if csi1000_index_return is not None and CSI500_FUTURES_COLUMN in filled.columns:
+        fallback = csi1000_index_return.reindex(calendar)
+        first_csi500_return_date = filled[CSI500_FUTURES_COLUMN].first_valid_index()
+        pre_listing_missing = filled[CSI500_FUTURES_COLUMN].isna()
+        if first_csi500_return_date is not None:
+            pre_listing_missing &= filled.index < first_csi500_return_date
+        filled.loc[pre_listing_missing, CSI500_FUTURES_COLUMN] = fallback.loc[pre_listing_missing]
+
     legacy_aligned = legacy_filled.reindex(calendar).reindex(columns=OUTPUT_COLUMNS)
     filled = filled.combine_first(legacy_aligned)
     return filled, official
@@ -850,6 +995,7 @@ def write_summary(
         f"- 输出列：`{', '.join(OUTPUT_COLUMNS)}`",
         "- 红利低波ETF：JYDB `512890.SH`，按 `ClosePrice / PrevClosePrice - 1` 计算百分比涨跌幅。",
         "- 一天期国债逆回购：FTDB `dbo.ths_GC / 204001.SH / ths_wgt_avg_interest_bbond`，单位 `%`，直接作为年化利率。",
+        "- 中证500主连：JYDB `Fut_TradingQuote / ExchangeCode=20 / OptionCode=4978`；填充版在期货收益上市前用 `QT_IndexQuote / InnerCode=39144` 的中证1000指数日涨跌幅补齐。",
         "",
         "## 缺失值",
         "",
@@ -945,7 +1091,13 @@ def main(argv: list[str] | None = None) -> int:
         futures_cache = read_futures_quote_cache()
         etf_cache = read_etf_quote_cache()
         gc001_cache = read_gc001_cache()
-        cache_dates = [cache_max_date(futures_cache), cache_max_date(etf_cache), cache_max_date(gc001_cache)]
+        csi1000_index_cache = read_csi1000_index_quote_cache()
+        cache_dates = [
+            cache_max_date(futures_cache),
+            cache_max_date(etf_cache),
+            cache_max_date(gc001_cache),
+            cache_max_date(csi1000_index_cache),
+        ]
         valid_cache_dates = [date for date in cache_dates if date is not None]
         if not valid_cache_dates:
             raise RuntimeError("缓存为空，无法执行 --rebuild-from-cache")
@@ -954,6 +1106,7 @@ def main(argv: list[str] | None = None) -> int:
             _skipped_stat("期货行情", futures_cache, initial_end),
             _skipped_stat("红利低波ETF行情", etf_cache, initial_end),
             _skipped_stat("GC001", gc001_cache, initial_end),
+            _skipped_stat("中证1000指数行情", csi1000_index_cache, initial_end),
         ]
     else:
         conn = connect_jydb(args)
@@ -990,24 +1143,41 @@ def main(argv: list[str] | None = None) -> int:
                 args.full_refresh,
                 args.dry_run,
             )
+            csi1000_index_cache_existing = read_csi1000_index_quote_cache(missing_ok=True)
+            csi1000_index_cache, csi1000_index_stat = refresh_csi1000_index_quote_cache(
+                conn,
+                csi1000_index_cache_existing,
+                start_date,
+                initial_end,
+                args.cache_overlap_days,
+                args.full_refresh,
+                args.dry_run,
+            )
         finally:
             conn.close()
 
-        cache_stats = [futures_stat, etf_stat, gc001_stat]
+        cache_stats = [futures_stat, etf_stat, gc001_stat, csi1000_index_stat]
 
     futures_returns, futures_prices, futures_summary = build_futures_outputs_from_cache(
         futures_cache, start_date, initial_end, args.lookback_days
     )
     etf_return = build_etf_return_from_cache(etf_cache, start_date, initial_end)
     gc001 = build_gc001_from_cache(gc001_cache, start_date, initial_end)
-    end_date = resolve_end_date([futures_returns, etf_return, gc001], requested_end)
+    csi1000_index_return = build_csi1000_index_return_from_cache(csi1000_index_cache, start_date, initial_end)
+    end_date = resolve_end_date([futures_returns, etf_return, gc001, csi1000_index_return], requested_end)
 
     official = futures_returns.loc[futures_returns.index <= end_date].copy()
     official[ETF_COLUMN] = etf_return.loc[etf_return.index <= end_date]
     official[REPO_COLUMN] = gc001.loc[gc001.index <= end_date]
     official = official.reindex(columns=OUTPUT_COLUMNS)
 
-    filled, unfilled = build_outputs(official, legacy_filled, start_date, end_date)
+    filled, unfilled = build_outputs(
+        official,
+        legacy_filled,
+        start_date,
+        end_date,
+        csi1000_index_return=csi1000_index_return.loc[csi1000_index_return.index <= end_date],
+    )
     futures_prices = futures_prices.loc[(futures_prices.index >= start_date) & (futures_prices.index <= end_date)]
 
     write_returns_csv(filled, SCRIPT_DIR / OUTPUT_FILLED, args.dry_run)

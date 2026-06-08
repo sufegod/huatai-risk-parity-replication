@@ -50,12 +50,14 @@ ORDER BY TradingDay;
 沪金主连,dbo.Fut_DailyQuote,10,313,AU,上海黄金期货
 豆粕主连,dbo.Fut_DailyQuote,13,345,M,大商所豆粕期货
 中证1000主连,dbo.Fut_TradingQuote,20,39144,IM,中证1000股指期货
+中证500主连,dbo.Fut_TradingQuote,20,4978,IC,中证500股指期货
 30年国债主连,dbo.Fut_TradingQuote,20,504,TL,30年期国债期货
 沪铜主连,dbo.Fut_DailyQuote,10,305,CU,上海铜期货
 沪铝主连,dbo.Fut_DailyQuote,10,310,AL,上海铝期货
 PTA主连,dbo.Fut_DailyQuote,15,322,TA,郑商所PTA期货
 原油主连,dbo.Fut_DailyQuote,11,319,SC,上海原油期货
 红利低波ETF,dbo.DZ_DailyQuote,,,512890.SH,华泰柏瑞中证红利低波动ETF
+中证1000指数,dbo.QT_IndexQuote,,,000852,中证500主连上市前收益回退
 
 -- 一天期国债逆回购: FTDB GC001 加权平均利率，单位 %
 SELECT
@@ -66,3 +68,14 @@ WHERE thscode = '204001.SH'
   AND time BETWEEN ? AND ?
   AND ths_wgt_avg_interest_bbond IS NOT NULL
 ORDER BY time;
+
+-- 中证1000指数: 用于中证500主连上市前填充版收益回退
+SELECT
+    TradingDay AS 日期,
+    CAST(PrevClosePrice AS float) AS PrevClosePrice,
+    CAST(ClosePrice AS float) AS ClosePrice,
+    CAST(ChangePCT AS float) AS ChangePCT
+FROM dbo.QT_IndexQuote
+WHERE InnerCode = 39144
+  AND TradingDay BETWEEN ? AND ?
+ORDER BY TradingDay;

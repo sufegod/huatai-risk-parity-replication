@@ -18,7 +18,7 @@ BACKTEST_DIR = PROJECT_ROOT / "策略复现与回测"
 SCRIPT_DIR = BACKTEST_DIR / "每日更新策略"
 
 DATA_UPDATE_SCRIPT = PROJECT_ROOT / "数据" / "日度收益数据更新" / "日度收益数据更新.py"
-STRATEGY_SCRIPT = BACKTEST_DIR / "策略代码" / "资产风险平价策略0.18（保证金修改+资金占用显示+日频调仓）.py"
+STRATEGY_SCRIPT = BACKTEST_DIR / "策略代码" / "资产风险平价策略0.19（IC替换IM）.py"
 OUTPUT_DIR = SCRIPT_DIR / "输出"
 
 WEIGHT_RETURNS_PATH = PROJECT_ROOT / "数据" / "日度收益数据更新" / "日涨跌幅_填充.csv"
@@ -70,7 +70,7 @@ def load_strategy_module(script_path: Path | None = None):
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="先更新日度数据，再生成v0.18每日策略仓位报告")
+    parser = argparse.ArgumentParser(description="先更新日度数据，再生成v0.19每日策略仓位报告")
     parser.add_argument("--data-end-date", help="传递给每日数据更新脚本的结束日期")
     parser.add_argument("--skip-data-update", action="store_true", help="跳过每日数据更新，仅基于现有CSV生成报告")
     parser.add_argument("--force-observation", action="store_true", help="兼容旧参数；日频调仓下策略数据日期本身即观察日")
@@ -505,7 +505,9 @@ def build_summary_markdown(
     weight_sum = positions["目标权重"].sum()
     margin_sum = positions["资金占用"].sum()
     top_positions = positions.sort_values("目标权重", ascending=False).head(8)
-    strategy_name = "风险平价策略"
+    strategy = load_strategy_module()
+    strategy_name = strategy.STRATEGY_NAME
+    strategy_version = getattr(strategy, "VERSION", "")
     strategy_metrics = backtest_result.df_metrics[
         (backtest_result.df_metrics["回测区间"] == "全局 (Total)")
         & (backtest_result.df_metrics["组合/资产"] == strategy_name)
@@ -521,6 +523,7 @@ def build_summary_markdown(
     lines = [
         "# 每日更新策略回测报告",
         "",
+        f"- 策略版本：`v{strategy_version}`",
         f"- 策略数据日期：`{report.as_of_date:%Y-%m-%d}`",
         f"- 回测区间：`{backtest_result.first_date:%Y-%m-%d}` 至 `{latest_date:%Y-%m-%d}`",
         f"- 日报观察日：`{report.as_of_date:%Y-%m-%d}`",

@@ -1,0 +1,584 @@
+import os
+from pathlib import Path
+
+PACKAGE_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = PACKAGE_DIR.parents[1]
+BACKTEST_DIR = PROJECT_DIR / '策略复现与回测'
+BASE_DIR = BACKTEST_DIR / '策略代码'
+MPLCONFIG_DIR = BASE_DIR / '.matplotlib'
+MPLCONFIG_DIR.mkdir(exist_ok=True)
+os.environ.setdefault('MPLCONFIGDIR', str(MPLCONFIG_DIR))
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+from scipy.optimize import minimize
+import warnings
+
+warnings.filterwarnings('ignore')
+
+# ================= 配置参数 =================
+VERSION = '0.18_1'
+STRATEGY_NAME = '风险平价策略'
+
+FILE_PATH_WEIGHT_RETURNS = PROJECT_DIR / '数据' / '日度收益数据更新' / '日涨跌幅_填充.csv'
+FILE_PATH_TRADE_RETURNS = PROJECT_DIR / '数据' / '日度收益数据更新' / '日涨跌幅_未填充.csv'
+FILE_PATH_INDEX_SIGNAL = PROJECT_DIR / '数据' / '原始数据' / '股指期货信号.xlsx'
+PARAMETER_TEST_DIR = BACKTEST_DIR / '回测指标' / '参数测试'
+TEST_OUTPUT_DIR = PARAMETER_TEST_DIR / f'IC替换IM测试_v{VERSION}'
+METRICS_DIR = TEST_OUTPUT_DIR
+NAV_DIR = METRICS_DIR / '净值'
+PERFORMANCE_DIR = METRICS_DIR / '指标'
+WEIGHTS_DIR = METRICS_DIR / '仓位明细'
+CHART_DIR = METRICS_DIR / '图表'
+BASELINE_METRICS_PATH = BACKTEST_DIR / '回测指标' / '指标' / '年度及全局回测指标_v0.18.csv'
+
+MONTH_END_FREQ = 'M'
+WEEKLY_REBALANCE_FREQ = 'W-FRI'
+REBALANCE_MODE = 'daily'
+FEE_RATE = 0.0005
+REPO_FEE_RATE = 0.000001
+EWMA_DECAY = 0.97
+INDEX_BASE_WEIGHT = 0.30
+INDEX_FUTURES = ['沪深300主连', '中证500主连']
+
+MARGIN_RATIOS_EXCHANGE_MIN = {
+    '沪深300主连': 0.08,
+    '中证500主连': 0.08,
+    '红利低波ETF': 1.00,
+    '10年国债主连': 0.02,
+    '30年国债主连': 0.035,
+    '沪铜主连': 0.05,
+    '沪铝主连': 0.05,
+    'PTA主连': 0.05,
+    '原油主连': 0.05,
+    '豆粕主连': 0.05,
+    '沪金主连': 0.04
+}
+
+MARGIN_RATIOS_BROKER = {
+    '沪深300主连': 0.14,
+    '中证500主连': 0.14,
+    '红利低波ETF': 1.00,
+    '10年国债主连': 0.025,
+    '30年国债主连': 0.05,
+    '沪铜主连': 0.16,
+    '沪铝主连': 0.16,
+    'PTA主连': 0.17,
+    '原油主连': 0.32,
+    '豆粕主连': 0.13,
+    '沪金主连': 0.28
+}
+
+# 默认使用期货公司实际保证金比例。
+MARGIN_RATIOS = MARGIN_RATIOS_BROKER
+
+RISK_PARITY_ASSET_CLASSES = {
+    '股票': ['红利低波ETF'],
+    '债券': ['10年国债主连', '30年国债主连'],
+    '商品': ['沪铜主连', '沪铝主连', 'PTA主连', '原油主连', '豆粕主连'],
+    '黄金': ['沪金主连']
+}
+
+PLOT_ASSET_CLASSES = {
+    '股指期货': INDEX_FUTURES,
+    **RISK_PARITY_ASSET_CLASSES
+}
+
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Arial Unicode MS']
+plt.rcParams['axes.unicode_minus'] = False
+
+
+# ================= 核心模型函数 =================
+def calculate_ewma_semi_cov(returns_df, decay=0.97):
+    downside = np.minimum(returns_df.values, 0.0)
+    T, N = downside.shape
+    w = (decay ** np.arange(T - 1, -1, -1))
+    w /= np.sum(w)
+    weighted = downside * np.sqrt(w[:, np.newaxis])
+    return np.dot(weighted.T, weighted) * 252 + np.eye(N) * 1e-8
+
+
+def risk_parity_convex_objective(x, cov_matrix):
+    n = len(x)
+    return 0.5 * np.dot(x.T, np.dot(cov_matrix, x)) - np.sum(np.log(x)) / n
+
+
+def risk_parity_convex_jacobian(x, cov_matrix):
+    n = len(x)
+    return np.dot(cov_matrix, x) - 1.0 / (n * x)
+
+
+def get_risk_parity_weights(cov_matrix):
+    n = cov_matrix.shape[0]
+    res = minimize(
+        risk_parity_convex_objective,
+        np.ones(n),
+        args=(cov_matrix,),
+        method='L-BFGS-B',
+        jac=risk_parity_convex_jacobian,
+        bounds=[(1e-8, None)] * n,
+        options={'ftol': 1e-12}
+    )
+    return res.x / np.sum(res.x)
+
+
+def calculate_metrics(ret_series, margin_series=None):
+    if len(ret_series) < 5:
+        return {k: "0.00%" for k in ['年化收益', '年化波动', '夏普比率', '最大回撤', '月度胜率']}
+
+    ret_series = ret_series.fillna(0)
+    nav = (1 + ret_series).cumprod()
+    y = len(ret_series) / 252.0
+
+    ann_ret = nav.iloc[-1] ** (1 / y) - 1 if y > 0 else 0.0
+    ann_vol = ret_series.std() * np.sqrt(252)
+
+    sharpe = (ret_series.mean() * 252) / ann_vol if ann_vol > 0 else 0.0
+
+    max_dd = ((nav / nav.cummax()) - 1).min()
+    monthly_ret = ret_series.resample(MONTH_END_FREQ).apply(lambda x: (1 + x).prod() - 1)
+    win_rate = (monthly_ret > 0).sum() / len(monthly_ret) if len(monthly_ret) > 0 else 0.0
+
+    res = {
+        '年化收益': f"{ann_ret:.2%}",
+        '年化波动': f"{ann_vol:.2%}",
+        '夏普比率': f"{sharpe:.2f}",
+        '最大回撤': f"{max_dd:.2%}",
+        '月度胜率': f"{win_rate:.2%}"
+    }
+    if margin_series is not None:
+        res['平均资金占用'] = f"{margin_series.mean():.2%}"
+    return res
+
+
+def get_asset_margin_series(asset, index):
+    margin_ratio = MARGIN_RATIOS.get(asset, 1.0)
+    return pd.Series(margin_ratio, index=index)
+
+
+def calculate_position_margin_usage(weights):
+    return float(sum(weight * MARGIN_RATIOS.get(asset, 1.0) for asset, weight in weights.items()))
+
+
+def load_returns_csv(file_path):
+    with file_path.open('r', encoding='utf-8-sig') as returns_file:
+        df = pd.read_csv(returns_file, index_col=0, parse_dates=True)
+    return df.dropna(how='all')
+
+
+def load_index_signal(file_path):
+    raw = pd.read_excel(file_path, sheet_name=0, header=None)
+    signal_col = None
+    for col in raw.columns:
+        values = raw[col].astype(str).str.strip()
+        if (values == '股指期货').any():
+            signal_col = col
+            break
+    if signal_col is None:
+        signal_col = 1
+
+    df = raw[[0, signal_col]].copy()
+    df.columns = ['date', 'signal']
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    df['signal'] = pd.to_numeric(df['signal'], errors='coerce')
+    df = df.dropna(subset=['date']).set_index('date').sort_index()
+    df = df[~df.index.duplicated(keep='last')]
+
+    first_valid = df['signal'].first_valid_index()
+    if first_valid is None:
+        raise ValueError("股指期货信号文件没有有效信号")
+    return df.loc[first_valid:, 'signal'].ffill()
+
+
+def get_observation_dates(index, rebalance_mode=REBALANCE_MODE):
+    if rebalance_mode == 'daily':
+        return pd.DatetimeIndex(index)
+    if rebalance_mode != 'weekly':
+        raise ValueError("rebalance_mode must be 'weekly' or 'daily'")
+
+    observations = []
+    date_series = pd.Series(index=index, data=index)
+    for _, group in date_series.groupby(pd.Grouper(freq=WEEKLY_REBALANCE_FREQ)):
+        if len(group) > 0:
+            observations.append(group.index[-1])
+    return pd.DatetimeIndex(observations)
+
+
+def normalize_index_signal(signal):
+    if pd.isna(signal) or signal <= 0:
+        return 0.0
+    return min(float(signal), 1.0)
+
+
+def allocate_index_futures(signal, assets, listing_dates, rebalance_date):
+    target = pd.Series(0.0, index=assets)
+    total_weight = INDEX_BASE_WEIGHT * normalize_index_signal(signal)
+    if total_weight <= 0:
+        return target
+
+    listed_index_futures = [
+        asset for asset in INDEX_FUTURES
+        if asset in assets
+        and listing_dates.get(asset) is not None
+        and listing_dates[asset] <= rebalance_date
+    ]
+    if not listed_index_futures:
+        return target
+
+    target.loc[listed_index_futures] = total_weight / len(listed_index_futures)
+    return target
+
+
+def dataframe_to_markdown(df):
+    if df.empty:
+        return "| 说明 |\n| --- |\n| 无可用数据 |"
+    columns = list(df.columns)
+    lines = [
+        "| " + " | ".join(columns) + " |",
+        "| " + " | ".join(["---"] * len(columns)) + " |",
+    ]
+    for _, row in df.iterrows():
+        values = ["" if pd.isna(row[col]) else str(row[col]) for col in columns]
+        lines.append("| " + " | ".join(values) + " |")
+    return "\n".join(lines)
+
+
+def load_total_strategy_metrics(path, scenario):
+    if not path.exists():
+        return None
+    df = pd.read_csv(path, encoding='utf-8-sig')
+    required = {'回测区间', '组合/资产'}
+    if not required.issubset(df.columns):
+        return None
+    rows = df[(df['回测区间'] == '全局 (Total)') & (df['组合/资产'] == STRATEGY_NAME)]
+    if rows.empty:
+        return None
+    row = rows.iloc[0].to_dict()
+    row['方案'] = scenario
+    return row
+
+
+def parse_metric_value(value):
+    if pd.isna(value):
+        return np.nan
+    text = str(value).strip()
+    if not text:
+        return np.nan
+    if text.endswith('%'):
+        return float(text[:-1]) / 100.0
+    return float(text)
+
+
+def format_delta(field, baseline, test):
+    try:
+        baseline_value = parse_metric_value(baseline.get(field))
+        test_value = parse_metric_value(test.get(field))
+    except (TypeError, ValueError):
+        return ''
+    if pd.isna(baseline_value) or pd.isna(test_value):
+        return ''
+    delta = test_value - baseline_value
+    if str(test.get(field, '')).strip().endswith('%') or str(baseline.get(field, '')).strip().endswith('%'):
+        return f"{delta:.2%}"
+    return f"{delta:.2f}"
+
+
+def write_comparison_outputs(metrics_filename, navs_filename, weights_filename, chart_filename):
+    comparison_filename = TEST_OUTPUT_DIR / f'IC替换IM核心指标对比_v{VERSION}.csv'
+    report_filename = TEST_OUTPUT_DIR / f'IC替换IM测试说明_v{VERSION}.md'
+
+    baseline = load_total_strategy_metrics(BASELINE_METRICS_PATH, 'v0.18 IF+IM')
+    test = load_total_strategy_metrics(metrics_filename, 'v0.18_1 IF+IC')
+    rows = [row for row in [baseline, test] if row is not None]
+
+    ordered_cols = [
+        '方案',
+        '回测区间',
+        '组合/资产',
+        '年化收益',
+        '年化波动',
+        '夏普比率',
+        '最大回撤',
+        '月度胜率',
+        '平均资金占用',
+    ]
+    df_compare = pd.DataFrame(rows)
+    if not df_compare.empty:
+        df_compare = df_compare[[col for col in ordered_cols if col in df_compare.columns]]
+    df_compare.to_csv(str(comparison_filename), index=False, encoding='utf-8-sig')
+
+    if baseline is not None and test is not None:
+        delta_rows = [
+            {'指标': field, 'v0.18': baseline.get(field, ''), 'v0.18_1': test.get(field, ''), '差异': format_delta(field, baseline, test)}
+            for field in ['年化收益', '年化波动', '夏普比率', '最大回撤', '月度胜率', '平均资金占用']
+        ]
+        df_delta = pd.DataFrame(delta_rows)
+        comparison_note = dataframe_to_markdown(df_delta)
+    else:
+        comparison_note = '缺少 v0.18 或 v0.18_1 的全局指标，无法生成完整差异表。'
+
+    report = f"""# v0.18_1 IC替换IM测试说明
+
+## 测试口径
+
+- 基础版本：`v0.18`。
+- 测试版本：`v{VERSION}`。
+- 核心差异：股指期货模块从 `沪深300主连 + 中证1000主连` 替换为 `沪深300主连 + 中证500主连`。
+- 中证500主连交易收益使用未填充版中的 IC 期货真实收益；权重估计收益在 IC 上市前使用中证1000指数日涨跌幅填充。
+- IC 保证金沿用股指期货口径：交易所最低 `8%`，期货公司实际 `14%`。
+
+## 全局核心指标对比
+
+{dataframe_to_markdown(df_compare)}
+
+## 指标差异
+
+{comparison_note}
+
+## 输出文件
+
+- 每日净值：`{navs_filename}`
+- 年度及全局指标：`{metrics_filename}`
+- 日度仓位明细：`{weights_filename}`
+- 回测图表：`{chart_filename}`
+- 核心指标对比：`{comparison_filename}`
+"""
+    report_filename.write_text(report, encoding='utf-8-sig')
+    return comparison_filename, report_filename
+
+
+# ================= 主流程 =================
+def main():
+    print(f"正在执行回测框架 v{VERSION}（IC替换IM测试，日频调仓）...")
+    METRICS_DIR.mkdir(parents=True, exist_ok=True)
+    NAV_DIR.mkdir(exist_ok=True)
+    PERFORMANCE_DIR.mkdir(exist_ok=True)
+    WEIGHTS_DIR.mkdir(exist_ok=True)
+    CHART_DIR.mkdir(exist_ok=True)
+
+    df_weight_raw = load_returns_csv(FILE_PATH_WEIGHT_RETURNS)
+    df_trade_raw = load_returns_csv(FILE_PATH_TRADE_RETURNS)
+    index_signal = load_index_signal(FILE_PATH_INDEX_SIGNAL)
+
+    # 原油主连不再使用布油连续补缺；布油连续仅作为原始保留列，后续不参与仓位或交易。
+    for df in (df_weight_raw, df_trade_raw):
+        if '布油连续' in df.columns:
+            df.drop(columns=['布油连续'], inplace=True)
+
+    df_weight_all = df_weight_raw / 100.0
+    df_trade_all_raw = df_trade_raw / 100.0
+    df_trade_all = df_trade_all_raw.fillna(0)
+
+    repo_rate_ann = df_trade_all.get('一天期国债逆回购', pd.Series(0.0, index=df_trade_all.index))
+
+    active_assets = []
+    for asset in INDEX_FUTURES:
+        if asset not in active_assets:
+            active_assets.append(asset)
+    for class_assets in RISK_PARITY_ASSET_CLASSES.values():
+        for asset in class_assets:
+            if asset not in active_assets:
+                active_assets.append(asset)
+
+    assets = [a for a in active_assets if a in df_weight_all.columns and a in df_trade_all.columns]
+    risk_parity_assets = [a for a in assets if a not in INDEX_FUTURES]
+
+    df_weight = df_weight_all[assets].fillna(0)
+    df_trade = df_trade_all[assets]
+    listing_dates = {
+        asset: df_trade_all_raw[asset].first_valid_index()
+        for asset in assets
+    }
+
+    signal_on_trade_dates = index_signal.reindex(df_trade.index, method='ffill')
+    first_signal_date = index_signal.first_valid_index()
+
+    calendar_days = df_trade_all.index.to_series().diff().dt.days.fillna(1)
+    repo_shifted = repo_rate_ann.shift(1).fillna(0)
+    repo_net_yield = np.maximum((repo_shifted / 365.0) * calendar_days - REPO_FEE_RATE, 0.0)
+
+    m_ratios = pd.Series({a: MARGIN_RATIOS.get(a, 1.0) for a in assets})
+    observation_dates = get_observation_dates(df_trade.index)
+
+    ret_series = pd.Series(0.0, index=df_trade.index)
+    margin_series = pd.Series(0.0, index=df_trade.index)
+    weight_recs = []
+
+    curr_w = pd.Series(0.0, index=assets)
+    curr_margin = 0.0
+    first_date = None
+
+    for i in range(len(observation_dates) - 1):
+        rebalance_date = observation_dates[i]
+        if rebalance_date < first_signal_date:
+            continue
+
+        raw_signal = signal_on_trade_dates.loc[rebalance_date]
+        if pd.isna(raw_signal):
+            continue
+
+        eligible_rp_assets = [
+            asset for asset in risk_parity_assets
+            if listing_dates.get(asset) is not None and listing_dates[asset] <= rebalance_date
+        ]
+        if len(eligible_rp_assets) == 0:
+            continue
+
+        look = df_weight.loc[rebalance_date - pd.DateOffset(months=12):rebalance_date, eligible_rp_assets]
+        if len(look) < 150:
+            continue
+
+        index_target = allocate_index_futures(raw_signal, assets, listing_dates, rebalance_date)
+        index_weight = float(index_target.sum())
+        remaining_weight = max(0.0, 1.0 - index_weight)
+
+        rp_active = get_risk_parity_weights(calculate_ewma_semi_cov(look, EWMA_DECAY))
+        target = pd.Series(0.0, index=assets)
+        target.loc[index_target.index] = index_target
+        target.loc[eligible_rp_assets] = rp_active * remaining_weight
+
+        holding_period = df_trade.loc[rebalance_date + pd.Timedelta(days=1):observation_dates[i + 1]]
+        if len(holding_period) == 0:
+            continue
+        if first_date is None:
+            first_date = holding_period.index[0]
+
+        for date, dr in holding_period.iterrows():
+            daily_repo = repo_net_yield.loc[date]
+
+            if date == holding_period.index[0]:
+                new_margin = (target * m_ratios).sum()
+                idle_cash = max(0.0, 1.0 - new_margin)
+                idle_return = idle_cash * daily_repo
+
+                cost = (target - curr_w).abs().sum() * FEE_RATE
+                ret_series.loc[date] = (target * dr).sum() - cost + idle_return
+
+                curr_w = target.copy()
+                weight_recs.append({
+                    'date': rebalance_date,
+                    '策略名称': STRATEGY_NAME,
+                    '股指期货信号': float(raw_signal),
+                    '股指期货仓位': index_weight,
+                    '资金占用比例': calculate_position_margin_usage(target),
+                    **{a: target.loc[a] for a in assets}
+                })
+            else:
+                idle_cash = max(0.0, 1.0 - curr_margin)
+                idle_return = idle_cash * daily_repo
+                ret_series.loc[date] = (curr_w * dr).sum() + idle_return
+
+            gross_weight = (curr_w * (1 + dr)).sum()
+            curr_w = (curr_w * (1 + dr)) / (gross_weight or 1)
+            curr_margin = (curr_w * m_ratios).sum()
+            margin_series.loc[date] = curr_margin
+
+    if first_date is None:
+        raise ValueError("日期或数据不满足条件")
+
+    print("正在生成每日净值数据...")
+    df_navs = pd.DataFrame(index=df_trade.loc[first_date:].index)
+    df_navs[STRATEGY_NAME] = (1 + ret_series.loc[first_date:]).cumprod()
+    navs_filename = NAV_DIR / f'策略每日净值走势_v{VERSION}.csv'
+    df_navs.to_csv(str(navs_filename), encoding='utf-8-sig')
+
+    print("正在计算年度与全局指标...")
+    all_metrics = []
+
+    def append_metrics(period_label, start_d, end_d):
+        for asset in assets:
+            asset_returns = df_trade.loc[start_d:end_d, asset]
+            asset_margin = get_asset_margin_series(asset, asset_returns.index)
+            m = calculate_metrics(asset_returns, asset_margin)
+            m['回测区间'] = period_label
+            m['组合/资产'] = asset
+            all_metrics.append(m)
+
+        m = calculate_metrics(ret_series.loc[start_d:end_d], margin_series.loc[start_d:end_d])
+        m['回测区间'] = period_label
+        m['组合/资产'] = STRATEGY_NAME
+        all_metrics.append(m)
+
+    append_metrics('全局 (Total)', first_date, df_trade.index[-1])
+
+    years = sorted(set(df_trade.loc[first_date:].index.year))
+    for y in years:
+        year_mask = (df_trade.index.year == y) & (df_trade.index >= first_date)
+        if year_mask.sum() > 20:
+            y_start = df_trade.index[year_mask][0]
+            y_end = df_trade.index[year_mask][-1]
+            append_metrics(f"{y}年", y_start, y_end)
+
+    df_m_all = pd.DataFrame(all_metrics)
+    cols_order = ['回测区间', '组合/资产', '年化收益', '年化波动', '夏普比率', '最大回撤', '月度胜率', '平均资金占用']
+    cols_order = [c for c in cols_order if c in df_m_all.columns]
+    df_m_all = df_m_all[cols_order]
+
+    metrics_filename = PERFORMANCE_DIR / f'年度及全局回测指标_v{VERSION}.csv'
+    df_m_all.to_csv(str(metrics_filename), index=False, encoding='utf-8-sig')
+
+    print("\n[全局回测总览]")
+    print(df_m_all[(df_m_all['回测区间'] == '全局 (Total)') & (df_m_all['组合/资产'] == STRATEGY_NAME)].set_index(
+        '组合/资产').to_string())
+
+    print("\n正在生成日度仓位明细...")
+    df_weights_all = pd.DataFrame(weight_recs)
+    weight_cols = ['date', '策略名称', '股指期货信号', '股指期货仓位'] + assets + ['资金占用比例']
+    df_weights_all = df_weights_all[weight_cols]
+    weights_filename = WEIGHTS_DIR / f'策略日度仓位明细_v{VERSION}.csv'
+    df_weights_all.to_csv(str(weights_filename), index=False, encoding='utf-8-sig')
+
+    print(f"\n数据文件已生成：\n 1. {navs_filename}\n 2. {metrics_filename}\n 3. {weights_filename}")
+
+    fig, axes = plt.subplots(3, 1, figsize=(16, 16), sharex=False)
+
+    axes[0].plot(df_navs.index, df_navs[STRATEGY_NAME], label=STRATEGY_NAME, color='purple', lw=2)
+    if '沪深300主连' in df_trade.columns:
+        axes[0].plot((1 + df_trade.loc[first_date:, '沪深300主连']).cumprod(), label='沪深300主连', color='blue',
+                     alpha=0.3)
+    if '10年国债主连' in df_trade.columns:
+        axes[0].plot((1 + df_trade.loc[first_date:, '10年国债主连']).cumprod(), label='10年国债主连', color='green',
+                     alpha=0.3)
+    axes[0].set_title('策略累计净值走势', fontsize=14)
+    axes[0].legend(loc='upper left')
+    axes[0].grid(True, ls='--', alpha=0.5)
+
+    df_w = df_weights_all.set_index('date')
+    df_c = pd.DataFrame({
+        cn: df_w[[a for a in al if a in assets]].sum(axis=1)
+        for cn, al in PLOT_ASSET_CLASSES.items()
+    })
+    axes[1].stackplot(
+        df_c.index,
+        df_c.T,
+        labels=df_c.columns,
+        alpha=0.8,
+        colors=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
+    )
+    axes[1].set_title('日度大类资产权重', fontsize=14)
+    axes[1].set_ylim(0, 1)
+    axes[1].yaxis.set_major_formatter(ticker.PercentFormatter(1.0))
+    axes[1].legend(loc='upper left')
+    axes[1].grid(True, ls='--', alpha=0.4)
+
+    axes[2].plot(df_w.index, df_w['股指期货信号'], label='股指期货信号', color='black', lw=1.5)
+    axes[2].plot(df_w.index, df_w['股指期货仓位'], label='股指期货仓位', color='blue', lw=1.5)
+    axes[2].set_title('股指期货信号与仓位', fontsize=14)
+    axes[2].set_ylim(-1.1, 1.1)
+    axes[2].yaxis.set_major_formatter(ticker.PercentFormatter(1.0))
+    axes[2].legend(loc='upper left')
+    axes[2].grid(True, ls='--', alpha=0.4)
+
+    plt.tight_layout()
+    chart_filename = CHART_DIR / f'回测图表_v{VERSION}.png'
+    plt.savefig(str(chart_filename), dpi=300)
+    print(f" 4. {chart_filename}")
+    comparison_filename, report_filename = write_comparison_outputs(metrics_filename, navs_filename, weights_filename, chart_filename)
+    print(f" 5. {comparison_filename}\n 6. {report_filename}")
+
+
+if __name__ == '__main__':
+    main()
+

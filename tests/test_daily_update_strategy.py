@@ -29,17 +29,30 @@ module = load_script_module(
 
 
 class DailyUpdateStrategyTests(unittest.TestCase):
-    def test_daily_update_uses_v018_strategy_script_by_default(self):
-        self.assertEqual(module.STRATEGY_SCRIPT.name, "资产风险平价策略0.18（保证金修改+资金占用显示+日频调仓）.py")
+    def test_daily_update_uses_v019_strategy_script_by_default(self):
+        self.assertEqual(module.STRATEGY_SCRIPT.name, "资产风险平价策略0.19（IC替换IM）.py")
 
         strategy_module = module.load_strategy_module()
 
-        self.assertEqual(strategy_module.VERSION, "0.18")
+        self.assertEqual(strategy_module.VERSION, "0.19")
+        self.assertEqual(strategy_module.INDEX_FUTURES, ["沪深300主连", "中证500主连"])
 
     def test_daily_weight_columns_append_margin_usage(self):
-        columns = module.daily_weight_columns(["沪深300主连", "10年国债主连"])
+        columns = module.daily_weight_columns(["沪深300主连", "中证500主连", "10年国债主连"])
 
-        self.assertEqual(columns, ["date", "策略名称", "股指期货信号", "股指期货仓位", "沪深300主连", "10年国债主连", "资金占用比例"])
+        self.assertEqual(
+            columns,
+            [
+                "date",
+                "策略名称",
+                "股指期货信号",
+                "股指期货仓位",
+                "沪深300主连",
+                "中证500主连",
+                "10年国债主连",
+                "资金占用比例",
+            ],
+        )
 
     def test_get_observation_dates_uses_all_trade_dates_for_daily_rebalance(self):
         dates = pd.to_datetime(["2026-05-18", "2026-05-19", "2026-05-21"])

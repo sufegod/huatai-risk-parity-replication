@@ -118,6 +118,95 @@ class UpdateDailyReturnsTests(unittest.TestCase):
             ["日期", "沪深300主连", "红利低波ETF", "一天期国债逆回购", "原油主连"],
         )
 
+    def test_futures_assets_include_csi500_contract_mapping(self):
+        assets = {asset.name: asset for asset in module.FUTURES_ASSETS}
+
+        self.assertIn("中证500主连", assets)
+        csi500 = assets["中证500主连"]
+        self.assertEqual(csi500.source, "financial")
+        self.assertEqual(csi500.exchange_code, 20)
+        self.assertEqual(csi500.option_code, 4978)
+        self.assertEqual(
+            module.OUTPUT_COLUMNS.index("中证500主连"),
+            module.OUTPUT_COLUMNS.index("中证1000主连") + 1,
+        )
+
+    def test_fetch_csi1000_index_quote_rows_queries_qt_indexquote(self):
+        captured = {}
+
+        def fake_fetch_dataframe(conn, sql, params):
+            captured["conn"] = conn
+            captured["sql"] = sql
+            captured["params"] = params
+            return pd.DataFrame(
+                {
+                    "日期": ["2026-05-29", "2026-05-28"],
+                    "PrevClosePrice": [100.0, 99.0],
+                    "ClosePrice": [101.0, 100.0],
+                    "ChangePCT": [1.0, 1.010101],
+                }
+            )
+
+        conn = object()
+        with patch.object(module, "fetch_dataframe", side_effect=fake_fetch_dataframe):
+            result = module.fetch_csi1000_index_quote_rows(
+                conn,
+                pd.Timestamp("2026-05-28"),
+                pd.Timestamp("2026-05-29"),
+            )
+
+        self.assertIs(captured["conn"], conn)
+        self.assertIn("dbo.QT_IndexQuote", captured["sql"])
+        self.assertIn("InnerCode = ?", captured["sql"])
+        self.assertEqual(captured["params"], (39144, "2026-05-28", "2026-05-29"))
+        self.assertEqual(list(result.columns), ["日期", "PrevClosePrice", "ClosePrice", "ChangePCT"])
+        self.assertEqual(list(result["日期"].dt.strftime("%Y-%m-%d")), ["2026-05-28", "2026-05-29"])
+
+    def test_build_outputs_fills_csi500_prelisting_with_csi1000_index_only_in_filled_output(self):
+        dates = pd.to_datetime(["2026-01-02", "2026-01-05", "2026-01-06"])
+        official = pd.DataFrame(
+            {"中证500主连": [pd.NA, 0.5, pd.NA]},
+            index=dates,
+        )
+        legacy_filled = pd.DataFrame(
+            {"中证500主连": [9.0, 9.0, 9.0]},
+            index=dates,
+        )
+        csi1000_index_return = pd.Series([1.1, 1.2, 1.3], index=dates, name="中证1000指数")
+
+        filled, unfilled = module.build_outputs(
+            official,
+            legacy_filled,
+            start_date=dates[0],
+            end_date=dates[-1],
+            csi1000_index_return=csi1000_index_return,
+        )
+
+        self.assertAlmostEqual(filled.loc[dates[0], "中证500主连"], 1.1)
+        self.assertAlmostEqual(filled.loc[dates[1], "中证500主连"], 0.5)
+        self.assertAlmostEqual(filled.loc[dates[2], "中证500主连"], 9.0)
+        self.assertTrue(pd.isna(unfilled.loc[dates[0], "中证500主连"]))
+        self.assertAlmostEqual(unfilled.loc[dates[1], "中证500主连"], 0.5)
+        self.assertTrue(pd.isna(unfilled.loc[dates[2], "中证500主连"]))
+
+    def test_build_outputs_keeps_datetime_index_for_csv_writes(self):
+        temp_dir = self.workspace_temp_dir("datetime_index_write")
+        dates = pd.to_datetime(["2026-01-02", "2026-01-05"])
+        official = pd.DataFrame({"中证500主连": [pd.NA, 0.5]}, index=dates)
+        legacy_filled = pd.DataFrame({"中证500主连": [1.0, 1.1]}, index=dates)
+        csi1000_index_return = pd.Series([2.0, 2.1], index=dates, name="中证1000指数")
+
+        filled, _ = module.build_outputs(
+            official,
+            legacy_filled,
+            start_date=dates[0],
+            end_date=dates[-1],
+            csi1000_index_return=csi1000_index_return,
+        )
+
+        self.assertIsInstance(filled.index, pd.DatetimeIndex)
+        module.write_returns_csv(filled, temp_dir / "returns.csv", dry_run=True)
+
     def test_compute_etf_return_uses_prev_close_on_adjustment_day(self):
         quotes = pd.DataFrame(
             {
@@ -216,6 +305,27 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         self.assertAlmostEqual(returns.loc[pd.Timestamp("2026-05-29"), "沪深300主连"], (240.0 / 220.0 - 1.0) * 100.0)
         self.assertEqual(summary[0]["行情行数"], 5)
 
+    def test_build_futures_outputs_from_cache_keeps_datetime_index_when_some_assets_have_no_quotes(self):
+        cached_quotes = pd.DataFrame(
+            [
+                ["沪深300主连", "financial", "2026-05-27", 1, "IF2606", 4000.0, 1],
+                ["沪深300主连", "financial", "2026-05-28", 1, "IF2606", 4010.0, 1],
+                ["沪深300主连", "financial", "2026-05-29", 1, "IF2606", 4020.0, 1],
+            ],
+            columns=["资产", "来源", "日期", "合约内部编码", "合约代码", "收盘价", "主力标志"],
+        )
+
+        returns, prices, _ = module.build_futures_outputs_from_cache(
+            cached_quotes,
+            start_date=pd.Timestamp("2026-05-27"),
+            end_date=pd.Timestamp("2026-05-29"),
+            lookback_days=0,
+        )
+
+        self.assertIsInstance(returns.index, pd.DatetimeIndex)
+        self.assertIsInstance(prices.index, pd.DatetimeIndex)
+        module.write_returns_csv(returns, self.workspace_temp_dir("futures_index_write") / "returns.csv", dry_run=True)
+
     def test_main_rebuild_from_cache_does_not_call_external_sources(self):
         legacy_frame = pd.DataFrame(index=pd.to_datetime(["2026-05-27", "2026-05-28", "2026-05-29"]))
         futures_cache = pd.DataFrame(
@@ -239,6 +349,14 @@ class UpdateDailyReturnsTests(unittest.TestCase):
                 "一天期国债逆回购": [1.5, 1.6, 1.7],
             }
         )
+        csi1000_index_cache = pd.DataFrame(
+            {
+                "日期": pd.to_datetime(["2026-05-27", "2026-05-28", "2026-05-29"]),
+                "PrevClosePrice": [100.0, 101.0, 102.0],
+                "ClosePrice": [101.0, 102.0, 103.0],
+                "ChangePCT": [1.0, 0.990099, 0.980392],
+            }
+        )
         written = {"returns": 0, "prices": 0, "summary": 0}
 
         def count_returns(*args, **kwargs):
@@ -257,6 +375,7 @@ class UpdateDailyReturnsTests(unittest.TestCase):
             patch.object(module, "read_futures_quote_cache", return_value=futures_cache),
             patch.object(module, "read_etf_quote_cache", return_value=etf_cache),
             patch.object(module, "read_gc001_cache", return_value=gc001_cache),
+            patch.object(module, "read_csi1000_index_quote_cache", return_value=csi1000_index_cache),
             patch.object(module, "connect_jydb", side_effect=AssertionError("JYDB should not be used")),
             patch.object(module, "write_returns_csv", side_effect=count_returns),
             patch.object(module, "write_price_csv", side_effect=count_prices),
@@ -359,12 +478,11 @@ class UpdateDailyReturnsTests(unittest.TestCase):
         self.assertFalse(target.exists())
 
     def test_refresh_futures_quote_cache_skips_when_target_not_newer_than_cache(self):
-        existing = pd.DataFrame(
-            [
-                ["沪深300主连", "financial", "2026-05-29", 1002, "IF2606", 4010.0, 1],
-            ],
-            columns=["资产", "来源", "日期", "合约内部编码", "合约代码", "收盘价", "主力标志"],
-        )
+        rows = [
+            [asset.name, asset.source, "2026-05-29", idx + 1000, f"{idx}2606", 4010.0 + idx, 1]
+            for idx, asset in enumerate(module.FUTURES_ASSETS)
+        ]
+        existing = pd.DataFrame(rows, columns=["资产", "来源", "日期", "合约内部编码", "合约代码", "收盘价", "主力标志"])
 
         with (
             patch.object(module, "fetch_futures_cache_rows", side_effect=AssertionError("should not fetch")),
@@ -380,9 +498,44 @@ class UpdateDailyReturnsTests(unittest.TestCase):
                 dry_run=False,
             )
 
-        self.assertEqual(len(result), 1)
+        self.assertEqual(len(result), len(module.FUTURES_ASSETS))
         self.assertTrue(stat.skipped)
         self.assertEqual(stat.previous_end, "2026-05-29")
+
+    def test_refresh_futures_quote_cache_fetches_full_history_when_configured_asset_missing(self):
+        existing = pd.DataFrame(
+            [
+                ["沪深300主连", "financial", "2026-05-29", 1002, "IF2606", 4010.0, 1],
+            ],
+            columns=["资产", "来源", "日期", "合约内部编码", "合约代码", "收盘价", "主力标志"],
+        )
+        incoming = pd.DataFrame(
+            [
+                ["中证500主连", "financial", "2015-04-16", 2001, "IC1505", 7000.0, 1],
+            ],
+            columns=existing.columns,
+        )
+
+        with (
+            patch.object(module, "fetch_futures_cache_rows", return_value=incoming) as fetch_mock,
+            patch.object(module, "write_cache_csv"),
+        ):
+            result, stat = module.refresh_futures_quote_cache(
+                conn=object(),
+                existing=existing,
+                fallback_start=pd.Timestamp("2013-01-04"),
+                target_end=pd.Timestamp("2026-05-29"),
+                overlap_days=7,
+                full_refresh=False,
+                dry_run=False,
+            )
+
+        fetch_mock.assert_called_once()
+        self.assertEqual(fetch_mock.call_args.args[1], pd.Timestamp("2013-01-04"))
+        self.assertEqual(fetch_mock.call_args.args[2], pd.Timestamp("2026-05-29"))
+        self.assertIn("中证500主连", set(result["资产"]))
+        self.assertFalse(stat.skipped)
+        self.assertEqual(stat.query_start, "2013-01-04")
 
     def test_refresh_futures_quote_cache_initializes_empty_cache_and_writes_result(self):
         incoming = pd.DataFrame(
