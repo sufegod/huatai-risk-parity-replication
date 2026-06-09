@@ -30,7 +30,7 @@ module = load_script_module(
 
 class DailyUpdateStrategyTests(unittest.TestCase):
     def test_daily_update_uses_v019_strategy_script_by_default(self):
-        self.assertEqual(module.STRATEGY_SCRIPT.name, "资产风险平价策略0.19（IC替换IM）.py")
+        self.assertEqual(module.STRATEGY_SCRIPT.name, "资产风险平价策略0.19（IC替换IM+日频胜率）.py")
 
         strategy_module = module.load_strategy_module()
 
@@ -121,6 +121,26 @@ class DailyUpdateStrategyTests(unittest.TestCase):
         for path in paths.values():
             self.assertNotIn("最新", path.name)
 
+    def test_latest_daily_return_formats_previous_trade_day_change(self):
+        df_navs = pd.DataFrame(
+            {"风险平价策略": [1.0, 1.02]},
+            index=pd.to_datetime(["2026-05-27", "2026-05-28"]),
+        )
+
+        result = module._latest_daily_return(df_navs, "风险平价策略")
+
+        self.assertEqual(result, "2.00%")
+
+    def test_latest_daily_return_uses_zero_when_nav_history_insufficient(self):
+        df_navs = pd.DataFrame(
+            {"风险平价策略": [1.0]},
+            index=pd.to_datetime(["2026-05-28"]),
+        )
+
+        result = module._latest_daily_return(df_navs, "风险平价策略")
+
+        self.assertEqual(result, "0.00%")
+
     def test_write_report_creates_classified_full_report_outputs(self):
         target_report = module.TargetReport(
             as_of_date=pd.Timestamp("2026-05-28"),
@@ -148,7 +168,7 @@ class DailyUpdateStrategyTests(unittest.TestCase):
                         "年化波动": "5.00%",
                         "夏普比率": "2.00",
                         "最大回撤": "-3.00%",
-                        "月度胜率": "60.00%",
+                        "日度胜率": "40.00%",
                         "平均资金占用": "10.00%",
                     }
                 ]
@@ -191,6 +211,9 @@ class DailyUpdateStrategyTests(unittest.TestCase):
             self.assertIn("日报观察日：`2026-05-28`", report_text)
             self.assertIn("仓位来源观察日：`2026-05-22`", report_text)
             self.assertIn("当前有效仓位", report_text)
+            self.assertIn("| 日度胜率 | 40.00% |", report_text)
+            self.assertNotIn("月度胜率", report_text)
+            self.assertIn("| 上一交易日 | 2.00% |", report_text)
             self.assertIn("回测图表_2026-05-28.png", report_text)
 
     def test_position_dataframe_labels_source_observation_date(self):

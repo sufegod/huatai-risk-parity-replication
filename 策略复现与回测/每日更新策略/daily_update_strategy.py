@@ -18,7 +18,7 @@ BACKTEST_DIR = PROJECT_ROOT / "策略复现与回测"
 SCRIPT_DIR = BACKTEST_DIR / "每日更新策略"
 
 DATA_UPDATE_SCRIPT = PROJECT_ROOT / "数据" / "日度收益数据更新" / "日度收益数据更新.py"
-STRATEGY_SCRIPT = BACKTEST_DIR / "策略代码" / "资产风险平价策略0.19（IC替换IM）.py"
+STRATEGY_SCRIPT = BACKTEST_DIR / "策略代码" / "资产风险平价策略0.19（IC替换IM+日频胜率）.py"
 OUTPUT_DIR = SCRIPT_DIR / "输出"
 
 WEIGHT_RETURNS_PATH = PROJECT_ROOT / "数据" / "日度收益数据更新" / "日涨跌幅_填充.csv"
@@ -444,7 +444,7 @@ def build_backtest_result() -> BacktestResult:
             append_metrics(f"{year}年", year_start, year_end)
 
     df_metrics = pd.DataFrame(all_metrics)
-    cols_order = ["回测区间", "组合/资产", "年化收益", "年化波动", "夏普比率", "最大回撤", "月度胜率", "平均资金占用"]
+    cols_order = ["回测区间", "组合/资产", "年化收益", "年化波动", "夏普比率", "最大回撤", "日度胜率", "平均资金占用"]
     cols_order = [col for col in cols_order if col in df_metrics.columns]
     df_metrics = df_metrics[cols_order]
 
@@ -495,6 +495,13 @@ def _period_return(df_navs: pd.DataFrame, start_date: pd.Timestamp, strategy_nam
     return f"{subset.iloc[-1] / subset.iloc[0] - 1:.2%}"
 
 
+def _latest_daily_return(df_navs: pd.DataFrame, strategy_name: str) -> str:
+    nav = df_navs[strategy_name].dropna()
+    if len(nav) < 2:
+        return "0.00%"
+    return f"{nav.iloc[-1] / nav.iloc[-2] - 1:.2%}"
+
+
 def build_summary_markdown(
     report: TargetReport,
     positions: pd.DataFrame,
@@ -516,6 +523,7 @@ def build_summary_markdown(
     nav = backtest_result.df_navs[strategy_name].dropna()
     ending_nav = nav.iloc[-1] if len(nav) else 0.0
     latest_date = backtest_result.df_navs.index[-1]
+    latest_daily_return = _latest_daily_return(backtest_result.df_navs, strategy_name)
     one_month = _period_return(backtest_result.df_navs, latest_date - pd.DateOffset(months=1), strategy_name)
     three_month = _period_return(backtest_result.df_navs, latest_date - pd.DateOffset(months=3), strategy_name)
     ytd = _period_return(backtest_result.df_navs, pd.Timestamp(year=latest_date.year, month=1, day=1), strategy_name)
@@ -543,13 +551,14 @@ def build_summary_markdown(
         f"| 年化波动 | {global_metrics.get('年化波动', '')} |",
         f"| 夏普比率 | {global_metrics.get('夏普比率', '')} |",
         f"| 最大回撤 | {global_metrics.get('最大回撤', '')} |",
-        f"| 月度胜率 | {global_metrics.get('月度胜率', '')} |",
+        f"| 日度胜率 | {global_metrics.get('日度胜率', '')} |",
         f"| 平均资金占用 | {global_metrics.get('平均资金占用', '')} |",
         "",
         "## 近期表现",
         "",
         "| 区间 | 收益 |",
         "| --- | ---: |",
+        f"| 上一交易日 | {latest_daily_return} |",
         f"| 近1月 | {one_month} |",
         f"| 近3月 | {three_month} |",
         f"| 年初至今 | {ytd} |",

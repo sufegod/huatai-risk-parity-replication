@@ -11,7 +11,7 @@ SCRIPT_PATH = (
     PROJECT_ROOT
     / "策略复现与回测"
     / "策略代码"
-    / "资产风险平价策略0.19（IC替换IM）.py"
+    / "资产风险平价策略0.19（IC替换IM+日频胜率）.py"
 )
 VERSION_NOTE_PATH = PROJECT_ROOT / "策略复现与回测" / "策略版本说明" / "v0.19策略版本说明.md"
 
@@ -43,6 +43,18 @@ class StrategyV019ICReplacementTests(unittest.TestCase):
         self.assertEqual(module.WEIGHTS_DIR.name, "仓位明细")
         self.assertEqual(module.CHART_DIR.name, "回测图表")
 
+    def test_calculate_metrics_reports_daily_win_rate(self):
+        module = load_script_module()
+        returns = pd.Series(
+            [0.01, -0.02, 0.00, 0.03, -0.01],
+            index=pd.to_datetime(["2026-01-02", "2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08"]),
+        )
+
+        metrics = module.calculate_metrics(returns)
+
+        self.assertEqual(metrics["日度胜率"], "40.00%")
+        self.assertNotIn("月度胜率", metrics)
+
     def test_allocate_index_futures_uses_if_and_ic_only(self):
         module = load_script_module()
         assets = ["沪深300主连", "中证500主连", "中证1000主连", "红利低波ETF"]
@@ -65,9 +77,10 @@ class StrategyV019ICReplacementTests(unittest.TestCase):
         text = VERSION_NOTE_PATH.read_text(encoding="utf-8-sig")
 
         self.assertIn("IC替换IM", text)
+        self.assertIn("日频胜率", text)
         self.assertIn("中证500主连", text)
         self.assertIn("日频调仓", text)
-        self.assertIn("资产风险平价策略0.19（IC替换IM）.py", text)
+        self.assertIn("资产风险平价策略0.19（IC替换IM+日频胜率）.py", text)
         self.assertIn("策略每日净值走势_v0.19.csv", text)
 
 

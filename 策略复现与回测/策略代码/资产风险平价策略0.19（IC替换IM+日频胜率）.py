@@ -123,7 +123,7 @@ def get_risk_parity_weights(cov_matrix):
 
 def calculate_metrics(ret_series, margin_series=None):
     if len(ret_series) < 5:
-        return {k: "0.00%" for k in ['年化收益', '年化波动', '夏普比率', '最大回撤', '月度胜率']}
+        return {k: "0.00%" for k in ['年化收益', '年化波动', '夏普比率', '最大回撤', '日度胜率']}
 
     ret_series = ret_series.fillna(0)
     nav = (1 + ret_series).cumprod()
@@ -135,15 +135,14 @@ def calculate_metrics(ret_series, margin_series=None):
     sharpe = (ret_series.mean() * 252) / ann_vol if ann_vol > 0 else 0.0
 
     max_dd = ((nav / nav.cummax()) - 1).min()
-    monthly_ret = ret_series.resample(MONTH_END_FREQ).apply(lambda x: (1 + x).prod() - 1)
-    win_rate = (monthly_ret > 0).sum() / len(monthly_ret) if len(monthly_ret) > 0 else 0.0
+    win_rate = (ret_series > 0).sum() / len(ret_series) if len(ret_series) > 0 else 0.0
 
     res = {
         '年化收益': f"{ann_ret:.2%}",
         '年化波动': f"{ann_vol:.2%}",
         '夏普比率': f"{sharpe:.2f}",
         '最大回撤': f"{max_dd:.2%}",
-        '月度胜率': f"{win_rate:.2%}"
+        '日度胜率': f"{win_rate:.2%}"
     }
     if margin_series is not None:
         res['平均资金占用'] = f"{margin_series.mean():.2%}"
@@ -391,7 +390,7 @@ def main():
             append_metrics(f"{y}年", y_start, y_end)
 
     df_m_all = pd.DataFrame(all_metrics)
-    cols_order = ['回测区间', '组合/资产', '年化收益', '年化波动', '夏普比率', '最大回撤', '月度胜率', '平均资金占用']
+    cols_order = ['回测区间', '组合/资产', '年化收益', '年化波动', '夏普比率', '最大回撤', '日度胜率', '平均资金占用']
     cols_order = [c for c in cols_order if c in df_m_all.columns]
     df_m_all = df_m_all[cols_order]
 
