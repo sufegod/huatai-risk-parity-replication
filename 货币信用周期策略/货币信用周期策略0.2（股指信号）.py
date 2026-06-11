@@ -192,21 +192,33 @@ def ensure_output_dirs():
 
 
 def write_strategy_note(asset_pool_map, output_files, first_signal_date):
+    relative_outputs = [Path(path).resolve().relative_to(PACKAGE_DIR) for path in output_files]
     lines = [
         "# 货币信用周期策略0.2（股指信号）说明",
         "",
-        "## 策略口径",
+        "## 策略定位",
         "",
-        "- 基于无信号版货币信用周期策略新增股指期货信号。",
-        "- 每月首个交易日调仓，使用同月货币信用周期象限选择非股指风险平价资产池。",
-        "- 股指期货信号采用独立覆盖口径，不受周期优选资产池是否剔除股指影响。",
-        f"- 股指信号覆盖：{'、'.join(INDEX_FUTURES)}。",
-        f"- 股指目标仓位 = {INDEX_BASE_WEIGHT:.0%} * min(max(signal, 0), 1)，在已上市股指期货中等权分配。",
-        f"- 股指信号首个有效日期：`{first_signal_date.date()}`。",
+        "- 本策略是在无信号版 `货币信用周期策略` 基础上新增股指期货信号的 0.2 版本。",
+        "- 股指期货信号采用独立覆盖口径，股指仓位由信号单独决定，剩余权重给当前周期下的非股指资产做风险平价。",
+        "- 股指信号覆盖：沪深300主连、中证1000主连、中证500主连。",
+        "",
+        "## 数据输入",
+        "",
+        f"- 权重估计收益：`{FILE_PATH_WEIGHT_RETURNS.relative_to(PROJECT_DIR)}`，收益单位为百分比点，策略内部转换为小数收益。",
+        f"- 交易收益：`{FILE_PATH_TRADE_RETURNS.relative_to(PROJECT_DIR)}`，用于实际组合收益计算。",
+        f"- 货币信用周期：`{FILE_PATH_CYCLE.relative_to(PROJECT_DIR)}`，按月份读取 `周期划分`。",
+        f"- 周期资产池：`{FILE_PATH_ASSET_POOL.relative_to(PROJECT_DIR)}`，三类有效周期读取优选资产池。",
+        f"- 股指期货信号：`{FILE_PATH_INDEX_SIGNAL.relative_to(PROJECT_DIR)}`，首个有效日期为 `{first_signal_date.date()}`。",
+        "",
+        "## 调仓规则",
+        "",
+        "- 回测从股指信号有效后的首个共同交易日开始。",
+        "- 每月首个交易日调仓，持有到下月首个交易日前一交易日；最后一期持有到当月最后一个交易日。",
+        "- 月初调仓使用同月货币信用周期象限，这是历史划分复现口径，不声明为无前视实盘信号。",
         "- 非股指风险平价资产使用调仓日前一交易日起向前 12 个月估计窗口，避免使用调仓当日收益。",
-        "- 闲置资金收益、手续费、保证金比例和 150 个有效交易日门槛沿用无信号版策略。",
+        "- 入选非股指资产需已上市，且估计窗口有效数据不少于 150 个交易日。",
         "",
-        "## 周期资产池",
+        "## 资产池与周期映射",
         "",
     ]
     for cycle in ALL_CYCLES:
@@ -214,13 +226,34 @@ def write_strategy_note(asset_pool_map, output_files, first_signal_date):
     lines.extend(
         [
             "",
-            "## 输出文件",
+            "## 风险平价与资金占用口径",
             "",
-            *[f"- `{path}`" for path in output_files],
+            f"- 股指目标仓位 = `{INDEX_BASE_WEIGHT:.0%} * min(max(signal, 0), 1)`，在已上市股指期货中等权分配。",
+            "- 负信号、空信号和 0 信号均按 0 仓位处理，信号大于 1 时按 1 截断。",
+            "- 当前周期资产池中的股指期货会从风险平价资产池中剔除，避免股指仓位重复配置。",
+            "- 非股指资产使用 EWMA 半协方差风险平价模型，权重缩放到 `1 - 股指期货仓位`。",
+            "- 资金占用比例按各资产目标权重乘以期货公司保证金比例计算；ETF 保证金比例按 100% 处理。",
+            "",
+            "## 闲置资金收益、手续费、保证金说明",
+            "",
+            "- 未被保证金占用的闲置资金按 `一天期国债逆回购` 前一交易日收益计息。",
+            "- 调仓换手成本使用 `0.0005`，逆回购日成本使用 `0.000001`。",
+            "- 保证金比例默认沿用无信号版策略中的 `MARGIN_RATIOS_BROKER`。",
+            "",
+            "## 输出目录与结果文件",
+            "",
+            "- 输出目录：`回测结果_0.2_股指信号/`。",
+            *[f"- `{path}`" for path in relative_outputs],
+            "",
+            "## 注意事项",
+            "",
+            "- 股指信号是独立覆盖，不受周期优选资产池是否包含股指期货影响。",
+            "- 若非股指风险平价有效资产不足，策略跳过该月调仓，不单独开股指裸仓。",
+            "- 若未来更新 `分析结果/三周期优选资产池.csv`，策略会自动使用新的周期资产池。",
             "",
         ]
     )
-    note_path = RESULT_DIR / "货币信用周期策略0.2（股指信号）说明.md"
+    note_path = PACKAGE_DIR / "货币信用周期策略0.2（股指信号）说明.md"
     note_path.write_text("\n".join(lines), encoding="utf-8")
     return note_path
 
