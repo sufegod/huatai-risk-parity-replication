@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>货币信用四象限资产表现显著性分析</title>
+  <style>
+    body {
+      margin: 0;
+      background: #f4f5f7;
+      color: #1f2430;
+      font-family: "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif;
+      line-height: 1.62;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 32px 28px 56px;
+      background: #ffffff;
+    }
+    h1 { font-size: 30px; margin: 0 0 8px; }
+    h2 { font-size: 22px; margin-top: 34px; border-bottom: 1px solid #d7dbe7; padding-bottom: 8px; }
+    h3 { font-size: 17px; margin-top: 24px; }
+    .meta { color: #6f768a; margin-bottom: 26px; }
+    .summary { background: #f8fafc; border-left: 4px solid #5477c4; padding: 14px 18px; }
+    figure { margin: 22px 0 30px; }
+    figure img { width: 100%; border: 1px solid #d7dbe7; }
+    figcaption { color: #6f768a; font-size: 13px; margin-top: 8px; }
+    .data-table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 14px 0 24px; }
+    .data-table th, .data-table td { border-bottom: 1px solid #e6e8f0; padding: 7px 8px; text-align: right; }
+    .data-table th:first-child, .data-table td:first-child,
+    .data-table th:nth-child(2), .data-table td:nth-child(2) { text-align: left; }
+    .data-table th { background: #f4f5f7; color: #1f2430; }
+    .note { color: #6f768a; font-size: 13px; }
+    code { background: #f4f5f7; padding: 1px 4px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>货币信用四象限资产表现显著性分析</h1>
+  <div class="meta">数据源：国信证券货币信用划分、日涨跌幅_填充.csv；生成日期：2026-06-11</div>
+
+  <h2>技术摘要</h2>
+  <div class="summary"><ul><li><strong>FDR 5% 口径下没有资产通过整体差异检验。</strong>这意味着在多重检验校正后，四象限信号对单资产月收益的可辨识度有限。</li><li><strong>样本结构不均衡：</strong>宽货币紧信用=69、宽货币宽信用=48、紧货币紧信用=14、紧货币宽信用=1。其中紧货币宽信用只有 1 个月，因此只展示描述统计，不参与主显著性检验。</li><li><strong>检验粒度：</strong>日收益先复利为月收益，再与月度象限匹配；样本期为 2015-01 至 2025-12，共 132 个月、12 个风险资产。</li></ul></div>
+
+  <h2>关键发现与视觉证据</h2>
+  <p>下表按 Kruskal-Wallis 的 FDR 校正后 p 值排序。Kruskal-Wallis 是本报告主检验；Welch ANOVA 作为均值差异的补充参考。显著性判断优先看 <code>Kruskal_FDR</code>。</p>
+  <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>资产</th>
+      <th>Kruskal_p值</th>
+      <th>Kruskal_FDR</th>
+      <th>Welch_p值</th>
+      <th>Welch_FDR</th>
+      <th>表现最好象限_按月均收益</th>
+      <th>表现最弱象限_按月均收益</th>
+      <th>最大月均收益差(百分点)</th>
+      <th>结论</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>30年国债主连</td>
+      <td>0.111</td>
+      <td>0.666</td>
+      <td>0.098</td>
+      <td>0.879</td>
+      <td>宽货币紧信用</td>
+      <td>紧货币紧信用</td>
+      <td>0.895</td>
+      <td>不显著</td>
+    </tr>
+    <tr>
+      <td>沪深300主连</td>
+      <td>0.111</td>
+      <td>0.666</td>
+      <td>0.439</td>
+      <td>0.879</td>
+      <td>宽货币宽信用</td>
+      <td>宽货币紧信用</td>
+      <td>1.301</td>
+      <td>不显著</td>
+    </tr>
+    <tr>
+      <td>中证500主连</td>
+      <td>0.328</td>
+      <td>0.890</td>
+      <td>0.616</td>
+      <td>0.904</td>
+      <td>宽货币宽信用</td>
+      <td>紧货币紧信用</td>
+      <td>1.483</td>
+      <td>不显著</td>
+    </tr>
+    <tr>
+      <td>沪金主连</td>
+      <td>0.423</td>
+      <td>0.890</td>
+      <td>0.156</td>
+      <td>0.879</td>
+      <td>宽货币宽信用</td>
+      <td>紧货币紧信用</td>
+      <td>1.424</td>
+      <td>不显著</td>
+    </tr>
+    <tr>
+      <td>中证1000主连</td>
+      <td>0.439</td>
+      <td>0.890</td>
+      <td>0.259</td>
+      <td>0.879</td>
+      <td>宽货币宽信用</td>
+      <td>紧货币紧信用</td>
+      <td>2.159</td>
+      <td>不显著</td>
+    </tr>
+    <tr>
+      <td>PTA主连</td>
+      <td>0.498</td>
+      <td>0.890</td>
+      <td>0.307</td>
+      <td>0.879</td>
+      <td>宽货币紧信用</td>
+      <td>宽货币宽信用</td>
+      <td>1.950</td>
+      <td>不显著</td>
+    </tr>
+    <tr>
+      <td>原油主连</td>
+      <td>0.557</td>
+      <td>0.890</td>
+      <td>0.377</td>
+      <td>0.879</td>
+      <td>紧货币紧信用</td>
+      <td>宽货币宽信用</td>
+      <td>2.805</td>
+      <td>不显著</td>
+    </tr>
+    <tr>
+      <td>沪铝主连</td>
+      <td>0.594</td>
+      <td>0.890</td>
+      <td>0.718</td>
+      <td>0.904</td>
+      <td>宽货币紧信用</td>
+      <td>紧货币紧信用</td>
+      <td>1.268</td>
+      <td>不显著</td>
+    </tr>
+    <tr>
+      <td>10年国债主连</td>
+      <td>0.814</td>
+      <td>0.933</td>
+      <td>0.737</td>
+      <td>0.904</td>
+      <td>宽货币紧信用</td>
+      <td>紧货币紧信用</td>
+      <td>0.253</td>
+      <td>不显著</td>
+    </tr>
+    <tr>
+      <td>沪铜主连</td>
+      <td>0.819</td>
+      <td>0.933</td>
+      <td>0.796</td>
+      <td>0.904</td>
+      <td>宽货币紧信用</td>
+      <td>紧货币紧信用</td>
+      <td>0.772</td>
+      <td>不显著</td>
+    </tr>
+    <tr>
+      <td>豆粕主连</td>
+      <td>0.855</td>
+      <td>0.933</td>
+      <td>0.931</td>
+      <td>0.931</td>
+      <td>宽货币宽信用</td>
+      <td>宽货币紧信用</td>
+      <td>0.358</td>
+      <td>不显著</td>
+    </tr>
+    <tr>
+      <td>红利低波ETF</td>
+      <td>0.997</td>
+      <td>0.997</td>
+      <td>0.829</td>
+      <td>0.904</td>
+      <td>宽货币紧信用</td>
+      <td>宽货币宽信用</td>
+      <td>0.663</td>
+      <td>不显著</td>
+    </tr>
+  </tbody>
+</table>
+
+  <figure>
+    <img src="显著性检验摘要图.png" alt="显著性检验摘要图">
+    <figcaption>三类有效象限整体差异的多重检验校正结果。竖线分别表示 FDR 5% 和 10% 阈值。</figcaption>
+  </figure>
+
+  <p>年化收益热力图展示四象限的描述性表现。紧货币宽信用只有 1 个月，其年化数字容易被单月收益放大，不能作为稳健结论。</p>
+  <figure>
+    <img src="四象限资产年化收益热力图.png" alt="四象限资产年化收益热力图">
+    <figcaption>单元格为各资产在对应象限下按月收益复利得到的年化收益，单位为 %。</figcaption>
+  </figure>
+
+  <p>箱线图只使用样本足够的三类象限，用于观察收益分布、离群点和中位数差异。</p>
+  <figure>
+    <img src="三类有效象限资产月收益箱线图.png" alt="三类有效象限资产月收益箱线图">
+    <figcaption>月收益单位为 %。图中未包含只有 1 个月样本的紧货币宽信用。</figcaption>
+  </figure>
+
+  <h2>剔除明显弱势周期后的三类资产池</h2>
+  <p>资产池只在三类有效周期内构建。规则是：对每个资产分别比较三类有效周期的年化收益，若某周期较该资产最佳周期低至少 10 个百分点，且不高于该资产三周期年化收益中位数，则剔除该资产在该周期的配置资格。</p>
+  <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>周期划分</th>
+      <th>入选资产数</th>
+      <th>剔除资产数</th>
+      <th>资产池</th>
+      <th>剔除资产</th>
+      <th>平均年化收益(%)</th>
+      <th>平均月均收益(%)</th>
+      <th>平均胜率(%)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>宽货币紧信用</td>
+      <td>10</td>
+      <td>2</td>
+      <td>10年国债主连、30年国债主连、PTA主连、中证1000主连、原油主连、沪金主连、沪铜主连、沪铝主连、红利低波ETF、豆粕主连</td>
+      <td>沪深300主连、中证500主连</td>
+      <td>9.180</td>
+      <td>0.894</td>
+      <td>56.667</td>
+    </tr>
+    <tr>
+      <td>宽货币宽信用</td>
+      <td>10</td>
+      <td>2</td>
+      <td>10年国债主连、30年国债主连、中证1000主连、中证500主连、沪深300主连、沪金主连、沪铜主连、沪铝主连、红利低波ETF、豆粕主连</td>
+      <td>原油主连、PTA主连</td>
+      <td>10.132</td>
+      <td>0.954</td>
+      <td>58.333</td>
+    </tr>
+    <tr>
+      <td>紧货币紧信用</td>
+      <td>6</td>
+      <td>6</td>
+      <td>10年国债主连、原油主连、沪深300主连、沪铜主连、红利低波ETF、豆粕主连</td>
+      <td>中证1000主连、PTA主连、中证500主连、沪金主连、沪铝主连、30年国债主连</td>
+      <td>10.307</td>
+      <td>0.870</td>
+      <td>59.524</td>
+    </tr>
+  </tbody>
+</table>
+  <figure>
+    <img src="三周期优选资产池.png" alt="三周期优选资产池">
+    <figcaption>资产池用于表达相对更适合的周期配置集合，不代表显著性检验通过，也不是因果结论。</figcaption>
+  </figure>
+
+  <h3>资产-周期剔除明细</h3>
+  <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>资产</th>
+      <th>周期划分</th>
+      <th>年化收益(%)</th>
+      <th>该资产最佳周期</th>
+      <th>与最佳周期差距(百分点)</th>
+      <th>三周期年化收益中位数(%)</th>
+      <th>是否剔除</th>
+      <th>剔除原因</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>10年国债主连</td>
+      <td>宽货币紧信用</td>
+      <td>3.121</td>
+      <td>宽货币紧信用</td>
+      <td>0.000</td>
+      <td>2.742</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>10年国债主连</td>
+      <td>宽货币宽信用</td>
+      <td>2.742</td>
+      <td>宽货币紧信用</td>
+      <td>0.379</td>
+      <td>2.742</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>10年国债主连</td>
+      <td>紧货币紧信用</td>
+      <td>0.018</td>
+      <td>宽货币紧信用</td>
+      <td>3.103</td>
+      <td>2.742</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>30年国债主连</td>
+      <td>宽货币紧信用</td>
+      <td>8.077</td>
+      <td>宽货币紧信用</td>
+      <td>0.000</td>
+      <td>5.884</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>30年国债主连</td>
+      <td>宽货币宽信用</td>
+      <td>5.884</td>
+      <td>宽货币紧信用</td>
+      <td>2.193</td>
+      <td>5.884</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>30年国债主连</td>
+      <td>紧货币紧信用</td>
+      <td>-2.814</td>
+      <td>宽货币紧信用</td>
+      <td>10.892</td>
+      <td>5.884</td>
+      <td>True</td>
+      <td>较最佳周期低 10.9 个百分点，且不高于三周期中位数</td>
+    </tr>
+    <tr>
+      <td>PTA主连</td>
+      <td>宽货币紧信用</td>
+      <td>9.974</td>
+      <td>宽货币紧信用</td>
+      <td>0.000</td>
+      <td>-7.418</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>PTA主连</td>
+      <td>宽货币宽信用</td>
+      <td>-12.595</td>
+      <td>宽货币紧信用</td>
+      <td>22.569</td>
+      <td>-7.418</td>
+      <td>True</td>
+      <td>较最佳周期低 22.6 个百分点，且不高于三周期中位数</td>
+    </tr>
+    <tr>
+      <td>PTA主连</td>
+      <td>紧货币紧信用</td>
+      <td>-7.418</td>
+      <td>宽货币紧信用</td>
+      <td>17.392</td>
+      <td>-7.418</td>
+      <td>True</td>
+      <td>较最佳周期低 17.4 个百分点，且不高于三周期中位数</td>
+    </tr>
+    <tr>
+      <td>中证1000主连</td>
+      <td>宽货币紧信用</td>
+      <td>10.689</td>
+      <td>宽货币紧信用</td>
+      <td>0.000</td>
+      <td>10.490</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>中证1000主连</td>
+      <td>宽货币宽信用</td>
+      <td>10.490</td>
+      <td>宽货币紧信用</td>
+      <td>0.199</td>
+      <td>10.490</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>中证1000主连</td>
+      <td>紧货币紧信用</td>
+      <td>-11.137</td>
+      <td>宽货币紧信用</td>
+      <td>21.825</td>
+      <td>10.490</td>
+      <td>True</td>
+      <td>较最佳周期低 21.8 个百分点，且不高于三周期中位数</td>
+    </tr>
+    <tr>
+      <td>中证500主连</td>
+      <td>宽货币紧信用</td>
+      <td>12.462</td>
+      <td>宽货币宽信用</td>
+      <td>13.467</td>
+      <td>12.462</td>
+      <td>True</td>
+      <td>较最佳周期低 13.5 个百分点，且不高于三周期中位数</td>
+    </tr>
+    <tr>
+      <td>中证500主连</td>
+      <td>宽货币宽信用</td>
+      <td>25.929</td>
+      <td>宽货币宽信用</td>
+      <td>0.000</td>
+      <td>12.462</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>中证500主连</td>
+      <td>紧货币紧信用</td>
+      <td>8.591</td>
+      <td>宽货币宽信用</td>
+      <td>17.338</td>
+      <td>12.462</td>
+      <td>True</td>
+      <td>较最佳周期低 17.3 个百分点，且不高于三周期中位数</td>
+    </tr>
+    <tr>
+      <td>原油主连</td>
+      <td>宽货币紧信用</td>
+      <td>13.322</td>
+      <td>紧货币紧信用</td>
+      <td>9.074</td>
+      <td>13.322</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>原油主连</td>
+      <td>宽货币宽信用</td>
+      <td>-16.791</td>
+      <td>紧货币紧信用</td>
+      <td>39.188</td>
+      <td>13.322</td>
+      <td>True</td>
+      <td>较最佳周期低 39.2 个百分点，且不高于三周期中位数</td>
+    </tr>
+    <tr>
+      <td>原油主连</td>
+      <td>紧货币紧信用</td>
+      <td>22.396</td>
+      <td>紧货币紧信用</td>
+      <td>0.000</td>
+      <td>13.322</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>沪深300主连</td>
+      <td>宽货币紧信用</td>
+      <td>-0.252</td>
+      <td>紧货币紧信用</td>
+      <td>18.409</td>
+      <td>15.779</td>
+      <td>True</td>
+      <td>较最佳周期低 18.4 个百分点，且不高于三周期中位数</td>
+    </tr>
+    <tr>
+      <td>沪深300主连</td>
+      <td>宽货币宽信用</td>
+      <td>15.779</td>
+      <td>紧货币紧信用</td>
+      <td>2.377</td>
+      <td>15.779</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>沪深300主连</td>
+      <td>紧货币紧信用</td>
+      <td>18.156</td>
+      <td>紧货币紧信用</td>
+      <td>0.000</td>
+      <td>15.779</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>沪金主连</td>
+      <td>宽货币紧信用</td>
+      <td>11.327</td>
+      <td>宽货币宽信用</td>
+      <td>4.892</td>
+      <td>11.327</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>沪金主连</td>
+      <td>宽货币宽信用</td>
+      <td>16.219</td>
+      <td>宽货币宽信用</td>
+      <td>0.000</td>
+      <td>11.327</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>沪金主连</td>
+      <td>紧货币紧信用</td>
+      <td>-1.033</td>
+      <td>宽货币宽信用</td>
+      <td>17.252</td>
+      <td>11.327</td>
+      <td>True</td>
+      <td>较最佳周期低 17.3 个百分点，且不高于三周期中位数</td>
+    </tr>
+    <tr>
+      <td>沪铜主连</td>
+      <td>宽货币紧信用</td>
+      <td>10.150</td>
+      <td>宽货币紧信用</td>
+      <td>0.000</td>
+      <td>4.748</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>沪铜主连</td>
+      <td>宽货币宽信用</td>
+      <td>4.748</td>
+      <td>宽货币紧信用</td>
+      <td>5.401</td>
+      <td>4.748</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>沪铜主连</td>
+      <td>紧货币紧信用</td>
+      <td>1.229</td>
+      <td>宽货币紧信用</td>
+      <td>8.920</td>
+      <td>4.748</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>沪铝主连</td>
+      <td>宽货币紧信用</td>
+      <td>8.132</td>
+      <td>宽货币紧信用</td>
+      <td>0.000</td>
+      <td>6.834</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>沪铝主连</td>
+      <td>宽货币宽信用</td>
+      <td>6.834</td>
+      <td>宽货币紧信用</td>
+      <td>1.298</td>
+      <td>6.834</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>沪铝主连</td>
+      <td>紧货币紧信用</td>
+      <td>-7.284</td>
+      <td>宽货币紧信用</td>
+      <td>15.416</td>
+      <td>6.834</td>
+      <td>True</td>
+      <td>较最佳周期低 15.4 个百分点，且不高于三周期中位数</td>
+    </tr>
+    <tr>
+      <td>红利低波ETF</td>
+      <td>宽货币紧信用</td>
+      <td>12.213</td>
+      <td>宽货币紧信用</td>
+      <td>0.000</td>
+      <td>10.482</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>红利低波ETF</td>
+      <td>宽货币宽信用</td>
+      <td>3.328</td>
+      <td>宽货币紧信用</td>
+      <td>8.885</td>
+      <td>10.482</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>红利低波ETF</td>
+      <td>紧货币紧信用</td>
+      <td>10.482</td>
+      <td>宽货币紧信用</td>
+      <td>1.731</td>
+      <td>10.482</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>豆粕主连</td>
+      <td>宽货币紧信用</td>
+      <td>4.794</td>
+      <td>紧货币紧信用</td>
+      <td>4.766</td>
+      <td>9.363</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>豆粕主连</td>
+      <td>宽货币宽信用</td>
+      <td>9.363</td>
+      <td>紧货币紧信用</td>
+      <td>0.197</td>
+      <td>9.363</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+    <tr>
+      <td>豆粕主连</td>
+      <td>紧货币紧信用</td>
+      <td>9.560</td>
+      <td>紧货币紧信用</td>
+      <td>0.000</td>
+      <td>9.363</td>
+      <td>False</td>
+      <td>保留</td>
+    </tr>
+  </tbody>
+</table>
+
+  <h2>各资产表现最好的有效象限</h2>
+  <p>下表只在三类有效象限内比较年化收益最高的象限，用于描述表现方向，不等同于显著性结论。</p>
+  <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>资产</th>
+      <th>年化收益最高的有效象限</th>
+      <th>样本月数</th>
+      <th>年化收益(%)</th>
+      <th>月均收益(%)</th>
+      <th>胜率(%)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>中证500主连</td>
+      <td>宽货币宽信用</td>
+      <td>48</td>
+      <td>25.929</td>
+      <td>2.236</td>
+      <td>70.833</td>
+    </tr>
+    <tr>
+      <td>原油主连</td>
+      <td>紧货币紧信用</td>
+      <td>14</td>
+      <td>22.396</td>
+      <td>1.867</td>
+      <td>50.000</td>
+    </tr>
+    <tr>
+      <td>沪深300主连</td>
+      <td>紧货币紧信用</td>
+      <td>14</td>
+      <td>18.156</td>
+      <td>1.445</td>
+      <td>71.429</td>
+    </tr>
+    <tr>
+      <td>沪金主连</td>
+      <td>宽货币宽信用</td>
+      <td>48</td>
+      <td>16.219</td>
+      <td>1.353</td>
+      <td>54.167</td>
+    </tr>
+    <tr>
+      <td>红利低波ETF</td>
+      <td>宽货币紧信用</td>
+      <td>69</td>
+      <td>12.213</td>
+      <td>1.110</td>
+      <td>55.072</td>
+    </tr>
+    <tr>
+      <td>中证1000主连</td>
+      <td>宽货币紧信用</td>
+      <td>69</td>
+      <td>10.689</td>
+      <td>1.202</td>
+      <td>53.623</td>
+    </tr>
+    <tr>
+      <td>沪铜主连</td>
+      <td>宽货币紧信用</td>
+      <td>69</td>
+      <td>10.150</td>
+      <td>0.940</td>
+      <td>59.420</td>
+    </tr>
+    <tr>
+      <td>PTA主连</td>
+      <td>宽货币紧信用</td>
+      <td>69</td>
+      <td>9.974</td>
+      <td>1.053</td>
+      <td>52.174</td>
+    </tr>
+    <tr>
+      <td>豆粕主连</td>
+      <td>紧货币紧信用</td>
+      <td>14</td>
+      <td>9.560</td>
+      <td>0.850</td>
+      <td>64.286</td>
+    </tr>
+    <tr>
+      <td>沪铝主连</td>
+      <td>宽货币紧信用</td>
+      <td>69</td>
+      <td>8.132</td>
+      <td>0.771</td>
+      <td>47.826</td>
+    </tr>
+    <tr>
+      <td>30年国债主连</td>
+      <td>宽货币紧信用</td>
+      <td>69</td>
+      <td>8.077</td>
+      <td>0.665</td>
+      <td>69.565</td>
+    </tr>
+    <tr>
+      <td>10年国债主连</td>
+      <td>宽货币紧信用</td>
+      <td>69</td>
+      <td>3.121</td>
+      <td>0.260</td>
+      <td>66.667</td>
+    </tr>
+  </tbody>
+</table>
+
+  <h2>Pairwise 检验结果</h2>
+  <p>仅对整体 Kruskal-Wallis 原始 p 值或 FDR 小于等于 10% 的资产做两两 Mann-Whitney U 检验，并再次做 FDR 校正。Cliff's delta 为组A相对组B的非参数效应量，正值表示组A整体收益更高。</p>
+  <p>没有 pairwise 比较在 FDR 10% 口径下达到显著或边际显著。</p>
+
+  <h2>范围、定义与方法</h2>
+  <ul>
+    <li>资产范围：排除 <code>一天期国债逆回购</code> 后的 12 个风险资产。</li>
+    <li>收益单位：输入日涨跌幅为百分比点；月收益按 <code>prod(1 + 日收益/100) - 1</code> 复利后再乘以 100。</li>
+    <li>主检验样本：宽货币紧信用、宽货币宽信用、紧货币紧信用三类。紧货币宽信用只有 1 个月，仅做描述。</li>
+    <li>整体差异：Kruskal-Wallis 非参数检验为主；Welch ANOVA 为补充。</li>
+    <li>多重检验：整体检验和 pairwise 检验分别使用 Benjamini-Hochberg FDR 校正。</li>
+    <li>资产池剔除规则：某资产某周期年化收益较该资产最佳周期低至少 10 个百分点，且不高于该资产三周期年化收益中位数。</li>
+  </ul>
+
+  <h2>限制、稳健性与后续建议</h2>
+  <ul>
+    <li>象限样本高度不均衡，尤其紧货币紧信用只有 14 个月、紧货币宽信用只有 1 个月；结论适合作为历史条件相关性证据，不应解读为因果关系。</li>
+    <li>本报告使用填充版收益数据，优点是资产历史连续，缺点是早期部分资产可能包含代理填充口径。</li>
+    <li>后续若用于资产配置规则，建议进一步加入未填充交易收益口径、滚动窗口检验和样本外检验。</li>
+  </ul>
+
+  <p class="note">配套明细文件：象限月度收益明细.csv、象限描述统计.csv、显著性检验结果.csv、资产周期剔除明细.csv、三周期优选资产池.csv。</p>
+</main>
+</body>
+</html>

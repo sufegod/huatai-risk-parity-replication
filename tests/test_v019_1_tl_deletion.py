@@ -34,6 +34,7 @@ class StrategyV0191TLDeletionTests(unittest.TestCase):
         self.assertEqual(module.INDEX_FUTURES, ["沪深300主连", "中证500主连"])
         self.assertEqual(module.RISK_PARITY_ASSET_CLASSES["债券"], ["10年国债主连"])
         self.assertEqual(module.TEST_OUTPUT_DIR.name, "TL删除测试_v0.19_1")
+        self.assertEqual(module.TEST_OUTPUT_DIR.parent.name, "策略测试结果")
 
         risk_parity_assets = {
             asset for assets in module.RISK_PARITY_ASSET_CLASSES.values() for asset in assets

@@ -29,8 +29,8 @@
 
 ## 输出文件
 
-- 每日净值：`D:\HuaweiMoveData\Users\tstone1\Documents\trae_projects\风险平价回测\华泰风险平价策略复现\策略复现与回测\回测指标\参数测试\TL删除测试_v0.19_1\净值\策略每日净值走势_v0.19_1.csv`
-- 年度及全局指标：`D:\HuaweiMoveData\Users\tstone1\Documents\trae_projects\风险平价回测\华泰风险平价策略复现\策略复现与回测\回测指标\参数测试\TL删除测试_v0.19_1\指标\年度及全局回测指标_v0.19_1.csv`
-- 日度仓位明细：`D:\HuaweiMoveData\Users\tstone1\Documents\trae_projects\风险平价回测\华泰风险平价策略复现\策略复现与回测\回测指标\参数测试\TL删除测试_v0.19_1\仓位明细\策略日度仓位明细_v0.19_1.csv`
-- 回测图表：`D:\HuaweiMoveData\Users\tstone1\Documents\trae_projects\风险平价回测\华泰风险平价策略复现\策略复现与回测\回测指标\参数测试\TL删除测试_v0.19_1\图表\回测图表_v0.19_1.png`
-- 核心指标对比：`D:\HuaweiMoveData\Users\tstone1\Documents\trae_projects\风险平价回测\华泰风险平价策略复现\策略复现与回测\回测指标\参数测试\TL删除测试_v0.19_1\TL删除核心指标对比_v0.19_1.csv`
+- 每日净值：`D:\HuaweiMoveData\Users\tstone1\Documents\trae_projects\风险平价回测\华泰风险平价策略复现\策略复现与回测\策略测试结果\TL删除测试_v0.19_1\净值\策略每日净值走势_v0.19_1.csv`
+- 年度及全局指标：`D:\HuaweiMoveData\Users\tstone1\Documents\trae_projects\风险平价回测\华泰风险平价策略复现\策略复现与回测\策略测试结果\TL删除测试_v0.19_1\指标\年度及全局回测指标_v0.19_1.csv`
+- 日度仓位明细：`D:\HuaweiMoveData\Users\tstone1\Documents\trae_projects\风险平价回测\华泰风险平价策略复现\策略复现与回测\策略测试结果\TL删除测试_v0.19_1\仓位明细\策略日度仓位明细_v0.19_1.csv`
+- 回测图表：`D:\HuaweiMoveData\Users\tstone1\Documents\trae_projects\风险平价回测\华泰风险平价策略复现\策略复现与回测\策略测试结果\TL删除测试_v0.19_1\图表\回测图表_v0.19_1.png`
+- 核心指标对比：`D:\HuaweiMoveData\Users\tstone1\Documents\trae_projects\风险平价回测\华泰风险平价策略复现\策略复现与回测\策略测试结果\TL删除测试_v0.19_1\TL删除核心指标对比_v0.19_1.csv`

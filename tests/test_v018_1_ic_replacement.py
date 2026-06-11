@@ -37,6 +37,7 @@ class StrategyV0181ICReplacementTests(unittest.TestCase):
         self.assertEqual(module.MARGIN_RATIOS_BROKER["中证500主连"], 0.14)
         self.assertEqual(module.MARGIN_RATIOS["中证500主连"], 0.14)
         self.assertEqual(module.TEST_OUTPUT_DIR.name, "IC替换IM测试_v0.18_1")
+        self.assertEqual(module.TEST_OUTPUT_DIR.parent.name, "策略测试结果")
 
     def test_allocate_index_futures_uses_if_and_ic_only(self):
         module = load_script_module()

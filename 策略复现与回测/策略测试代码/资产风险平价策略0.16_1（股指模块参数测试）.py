@@ -28,7 +28,7 @@ FILE_PATH_WEIGHT_RETURNS = PROJECT_DIR / '数据' / '日度收益数据更新' /
 FILE_PATH_TRADE_RETURNS = PROJECT_DIR / '数据' / '日度收益数据更新' / '日涨跌幅_未填充.csv'
 FILE_PATH_INDEX_SIGNAL = PROJECT_DIR / '数据' / '原始数据' / '股指期货信号.xlsx'
 METRICS_DIR = BACKTEST_DIR / '回测指标'
-PARAMETER_TEST_DIR = METRICS_DIR / '参数测试'
+PARAMETER_TEST_DIR = BACKTEST_DIR / '策略测试结果'
 TEST_OUTPUT_DIR = PARAMETER_TEST_DIR / f'股指模块参数测试_v{VERSION}'
 
 MONTH_END_FREQ = 'M'
