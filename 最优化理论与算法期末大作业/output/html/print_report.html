@@ -1,0 +1,144 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>基于 EWMA 半协方差的风险平价资产配置优化——凸重构、阻尼牛顿法与实证分析</title><style>
+    @page { size: A4; margin: 10mm 13mm; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; color: #17212b; background: #fff; }
+    body { font-family: SimSun, "Songti SC", "Noto Serif CJK SC", serif; font-size: 9.3pt; line-height: 1.52; }
+    .page { height: 277mm; position: relative; overflow: hidden; break-after: page; padding: 0 1mm 8mm; }
+    .page:last-child { break-after: auto; }
+    .running-head { height: 8mm; border-bottom: .35mm solid #aeb9c3; display:flex; justify-content:space-between; align-items:center; color:#687684; font: 7.5pt Arial, sans-serif; letter-spacing:.4px; }
+    h1, h2, h3 { font-family: SimHei, "Heiti SC", "Microsoft YaHei", sans-serif; color:#102a43; }
+    .page > h1 { font-size: 17pt; margin: 5mm 0 4mm; padding-left: 3mm; border-left: 1.4mm solid #1f5a83; }
+    h2 { font-size: 11pt; margin: 3.2mm 0 1.2mm; }
+    p { margin: 1.5mm 0 2.2mm; text-align: justify; }
+    ol { margin: 1.5mm 0 2mm 5mm; padding-left: 4mm; } li { margin: .8mm 0; }
+    code { font-family: Consolas, monospace; font-size: 8pt; background:#f2f5f7; padding:.3mm .8mm; }
+    .page-no { position:absolute; bottom:0; right:1mm; color:#82919e; font: 8pt Arial,sans-serif; }
+    .page-cover { padding: 15mm 9mm 8mm; }
+    .cover-rule { width:20mm; height:2mm; background:#1f5a83; margin-top:5mm; }
+    .cover-kicker { margin-top:9mm; color:#4d6575; font: 10pt "Microsoft YaHei",sans-serif; letter-spacing:1.3px; }
+    .cover-title { font-size: 24pt; line-height:1.35; margin:6mm 0 12mm; max-width:165mm; }
+    .cover-meta { display:grid; grid-template-columns:1fr 1fr; gap:2.5mm 12mm; border-top:.4mm solid #aeb9c3; border-bottom:.4mm solid #aeb9c3; padding:4mm 0; }
+    .cover-meta div { display:flex; gap:4mm; }.cover-meta b { color:#536574; width:17mm; }.cover-meta span { font-family:"Microsoft YaHei",sans-serif; }
+    .abstract { margin-top:10mm; padding:6mm; background:#f3f6f8; border-left:1.2mm solid #5e87a0; }.abstract h2 { margin-top:0; }
+    .keywords { margin-bottom:0; }.highlight-row { display:grid; grid-template-columns:repeat(3,1fr); gap:4mm; margin-top:8mm; }
+    .highlight-row div { border-top:.8mm solid #1f5a83; padding:4mm 2mm; }.highlight-row b { display:block; font:20pt Arial,sans-serif; color:#1f5a83; }.highlight-row span { color:#5e6d78; }
+    .equation { margin:3mm auto; padding:3mm 5mm; text-align:center; background:#f4f7f9; border-left:1mm solid #7f9eb2; font-family:"Times New Roman",SimSun,serif; font-size:11pt; }
+    .equation.strong { background:#eaf1f5; border-color:#1f5a83; font-size:12pt; }
+    .proof, .callout, .final-note { margin:3mm 0; padding:3.2mm 4mm; background:#f7f5ee; border: .3mm solid #d8cda6; }
+    .source { color:#667682; font-size:7.5pt; border-top:.25mm solid #d9e0e5; padding-top:1.2mm; }
+    .data-table { width:100%; border-collapse:collapse; margin:3mm 0; font-family:"Microsoft YaHei",sans-serif; font-size:8pt; }
+    .data-table th { background:#1f5a83; color:#fff; font-weight:600; padding:1.7mm 1.5mm; text-align:left; }
+    .data-table td { border-bottom:.25mm solid #d8e0e5; padding:1.45mm 1.5mm; }.data-table tbody tr:nth-child(even) { background:#f5f7f9; }
+    .data-table.small { font-size:7.2pt; margin:2mm 0; }.data-table.small th,.data-table.small td { padding:1.05mm 1.1mm; }
+    .figure { margin:2.5mm auto; text-align:center; }.figure img { display:block; max-width:100%; max-height:114mm; margin:auto; }
+    .figure.compact img { max-height:91mm; }.figure figcaption { margin-top:1.3mm; font-size:7.6pt; color:#3d4e5a; }.figure figcaption span { color:#7a8791; }
+    .two-col { display:grid; grid-template-columns:1fr 1fr; gap:5mm; align-items:start; }.two-col .figure img { max-height:83mm; }
+    .text-cols { margin-bottom:2mm; }.pseudo { background:#172b3a; color:#edf3f6; padding:4mm; line-height:1.65; font-family:Consolas,"Microsoft YaHei",sans-serif; font-size:8pt; border-radius:1mm; }
+    .method-strip { display:flex; align-items:center; justify-content:space-between; padding:3mm 5mm; background:#eaf1f5; color:#163e59; font-family:"Microsoft YaHei",sans-serif; }
+    .method-strip span { font-weight:600; }.weights-layout { grid-template-columns:1.05fr .95fr; gap:6mm; }.weights-layout .data-table { margin-top:0; }
+    .conclusions li { margin-bottom:2.2mm; }.references { font-size:7.8pt; line-height:1.35; }.final-note { margin-top:4mm; background:#eaf1f5; border-color:#93afbf; }
+    </style></head><body><section class="page page-cover">
+      <div class="cover-rule"></div>
+      <div class="cover-kicker">最优化理论与算法 · 课程大作业</div>
+      <h1 class="cover-title">基于 EWMA 半协方差的风险平价资产配置优化——凸重构、阻尼牛顿法与实证分析</h1>
+      <div class="cover-meta">
+        <div><b>姓名</b><span>请填写</span></div>
+        <div><b>学号</b><span>请填写</span></div>
+        <div><b>数据区间</b><span>2013-01-04—2026-04-03</span></div>
+        <div><b>完成日期</b><span>2026年7月13日</span></div>
+      </div>
+      <div class="abstract"><h2>摘要</h2>
+        <p>本文研究多资产配置中的等风险贡献优化。针对原始风险贡献平方差模型尺度小、非凸且数值敏感的问题，采用对数障碍严格凸重构，推导梯度、Hessian 与 KKT 条件，并自行实现保持正权重的阻尼牛顿法。基于项目内9类ETF代理资产2013—2026年日收益，使用252日、衰减系数0.97的 EWMA 半协方差进行月度滚动回测，并与 L-BFGS-B、SLSQP、等权和逆下行波动率方法比较。结果表明，验证期风险平价年化收益为8.20%、年化波动为4.21%、夏普为1.89，其优势主要来自风险控制而非最高绝对收益。</p>
+        <p class="keywords"><b>关键词：</b>风险平价；EWMA半协方差；凸优化；阻尼牛顿法；资产配置</p>
+      </div>
+      <div class="highlight-row">
+        <div><b>1.89</b><span>验证期夏普</span></div>
+        <div><b>8 次</b><span>牛顿法中位迭代</span></div>
+        <div><b>2.14e-09</b><span>滚动最大RC误差</span></div>
+      </div>
+    <div class="page-no">1 / 10</div></section><section class="page"><div class="running-head"><span>最优化理论与算法期末大作业</span><span>02</span></div><h1>1　问题背景、研究意义与数据</h1>
+      <h2>1.1 为什么要从资本权重转向风险预算</h2>
+      <p>等权组合在名义资金上平均分配，却可能被股票和商品等高波动资产主导。风险平价直接约束各资产对组合方差的贡献，使“分散”从资本比例转化为风险比例。华泰研究关于中国版全天候策略的讨论为本研究提供背景；本文不复制研报图表，全部实证结果均由项目静态数据重新计算。</p>
+      <h2>1.2 数据来源与清洗</h2>
+      <p>数据来自 <code>数据/原始数据/ETF风险平价回测数据.xlsx</code> 的“日涨跌幅”表，收益由百分数除以100。ETF成立前的项目原有指数代理被保留，这一处理扩大了历史覆盖，但也限制了结果作为真实可交易业绩的解释。</p>
+      <table class="data-table"><thead><tr><th>检查项</th><th>结果</th><th>判定</th></tr></thead><tbody><tr><td>交易日与区间</td><td>3216日，2013-01-04—2026-04-03</td><td>通过</td></tr><tr><td>资产数量</td><td>9</td><td>通过</td></tr><tr><td>日期重复</td><td>0</td><td>通过</td></tr><tr><td>原始缺失单元格</td><td>3</td><td>3个孤立值按0收益处理</td></tr><tr><td>清洗后缺失</td><td>0</td><td>通过</td></tr><tr><td>日收益范围</td><td>-10.01% 至 9.99%</td><td>合理性复核</td></tr></tbody></table>
+      <div class="callout"><b>研究划分：</b>2014—2020年为训练期；2021-01-01至2026-04-03为样本外验证期。参数只在训练期排序，避免使用验证期反向选参。</div>
+      <h2>1.3 研究问题</h2>
+      <ol><li>凸重构能否稳定得到唯一的等风险贡献解？</li><li>自实现阻尼牛顿法相对通用求解器的精度、速度和病态稳定性如何？</li><li>EWMA半协方差风险平价能否在样本外改善波动、回撤和夏普？</li></ol>
+      <p class="source">资料来源：项目原始Excel、清洗后CSV及华泰研究研报；数据质量统计由程序生成。</p>
+    <div class="page-no">2 / 10</div></section><section class="page"><div class="running-head"><span>最优化理论与算法期末大作业</span><span>03</span></div><h1>2　数学模型与凸等价重构</h1>
+      <h2>2.1 原始等风险贡献模型</h2>
+      <p>设资产权重为 <i>w</i>，满足 <i>w</i><sub>i</sub>≥0 且 1ᵀ<i>w</i>=1。组合方差与第 <i>i</i> 个资产的风险贡献分别为：</p>
+      <div class="equation">σ²(<i>w</i>) = <i>w</i>ᵀΣ<i>w</i>，　RC<sub>i</sub> = <i>w</i><sub>i</sub>(Σ<i>w</i>)<sub>i</sub></div>
+      <p>等风险贡献可直接写为下列带等式约束的四次优化：</p>
+      <div class="equation">min<sub><i>w</i></sub>　Σ<sub>i</sub>[RC<sub>i</sub> − <i>w</i>ᵀΣ<i>w</i>/n]²</div>
+      <p>该目标随协方差尺度显著变化，并非全局凸；直接使用SLSQP容易受到初值、停止阈值和病态矩阵影响。</p>
+      <h2>2.2 对数障碍严格凸重构</h2>
+      <div class="equation strong">min<sub><i>x</i>&gt;0</sub>　f(<i>x</i>) = ½<i>x</i>ᵀΣ<i>x</i> − Σ<sub>i</sub>b<sub>i</sub>ln <i>x</i><sub>i</sub>，　b<sub>i</sub>=1/n</div>
+      <p>求解后归一化 <i>w</i>=<i>x</i>/(1ᵀ<i>x</i>)。主实验使用负收益 <i>r</i><sub>t</sub><sup>−</sup>=min(<i>r</i><sub>t</sub>,0) 构造 EWMA 半协方差，并加入10<sup>−8</sup>I：</p>
+      <div class="equation">Σ = Σ<sub>t</sub> α<sub>t</sub><i>r</i><sub>t</sub><sup>−</sup>(<i>r</i><sub>t</sub><sup>−</sup>)ᵀ + 10<sup>−8</sup>I，　α<sub>t</sub>∝0.97<sup>T−t</sup></div>
+      <h2>2.3 梯度、Hessian 与最优性证明</h2>
+      <div class="equation">∇f(<i>x</i>)=Σ<i>x</i>−<i>b</i>/<i>x</i>，　∇²f(<i>x</i>)=Σ+diag(<i>b</i>/<i>x</i>²)</div>
+      <div class="proof"><b>命题：</b>该模型存在唯一最优解，归一化后满足给定风险预算。<br><b>证明：</b>脊参数使Σ正定，且diag(<i>b</i>/<i>x</i>²)正定，因此Hessian处处正定，f严格凸。最优点满足Σ<i>x</i>−<i>b</i>/<i>x</i>=0，即 <i>x</i><sub>i</sub>(Σ<i>x</i>)<sub>i</sub>=b<sub>i</sub>。归一化只对全部风险贡献乘同一尺度，故相对风险贡献等于b<sub>i</sub>；严格凸性保证最优解唯一。证毕。</div>
+      <p class="source">资料来源：模型推导由本文完成；理论背景参考 Maillard 等（2010）与 Spinu（2013）。</p>
+    <div class="page-no">3 / 10</div></section><section class="page"><div class="running-head"><span>最优化理论与算法期末大作业</span><span>04</span></div><h1>3　阻尼牛顿法与求解器比较</h1>
+      <div class="two-col text-cols">
+        <div><h2>3.1 自实现算法</h2><div class="pseudo"><b>输入：</b>Σ、风险预算b、tol=10<sup>−10</sup><br>1　初始化 x&gt;0<br>2　计算 g=Σx−b/x，H=Σ+diag(b/x²)<br>3　解 Hp=−g<br>4　由 x+αp&gt;0 得到最大可行步长<br>5　Armijo 回溯：f(x+αp)≤f(x)+10<sup>−4</sup>αgᵀp<br>6　若 ‖g‖∞≤tol 则停止，否则返回第2步<br><b>输出：</b>w=x/(1ᵀx)</div></div>
+        <div><h2>3.2 对照算法</h2><p><b>L-BFGS-B：</b>求解同一凸模型，使用解析梯度与正下界。</p><p><b>SLSQP：</b>求解原始风险贡献平方差模型，显式施加权重和为1及非负约束，并按协方差量级缩放目标。</p><p>三者统一上限1000次；比较成功率、迭代数、耗时和最大风险贡献误差。</p></div>
+      </div>
+      <figure class="figure compact"><img src="file:///C:/Users/Administrator/Documents/%E9%A3%8E%E9%99%A9%E5%B9%B3%E4%BB%B7%E4%B8%8E%E5%85%A8%E5%A4%A9%E5%80%99%E7%AD%96%E7%95%A5/huatai-risk-parity-replication/%E6%9C%80%E4%BC%98%E5%8C%96%E7%90%86%E8%AE%BA%E4%B8%8E%E7%AE%97%E6%B3%95%E6%9C%9F%E6%9C%AB%E5%A4%A7%E4%BD%9C%E4%B8%9A/output/figures/solver_convergence.png" alt="图1　代表窗口中阻尼牛顿法的目标、梯度与风险贡献误差收敛轨迹"><figcaption>图1　代表窗口中阻尼牛顿法的目标、梯度与风险贡献误差收敛轨迹<br><span>资料来源：本课程实验程序生成。</span></figcaption></figure>
+      <table class="data-table small"><thead><tr><th>算法</th><th>成功率</th><th>中位迭代</th><th>中位耗时/ms</th><th>中位RC误差</th><th>最大RC误差</th></tr></thead><tbody><tr><td>阻尼牛顿法</td><td>98.0%</td><td>8.0</td><td>0.304</td><td>1.09e-12</td><td>2.14e-09</td></tr><tr><td>L-BFGS-B</td><td>100.0%</td><td>29.0</td><td>3.420</td><td>1.47e-09</td><td>1.26e-08</td></tr><tr><td>SLSQP</td><td>95.3%</td><td>42.5</td><td>6.700</td><td>2.99e-07</td><td>2.47e-06</td></tr></tbody></table>
+      <p>阻尼牛顿法中位仅8次迭代，运行时间中位数为0.304 ms；其滚动窗口最大风险贡献误差为2.14e-09。未达到严格梯度阈值的个别窗口仍满足1×10<sup>−6</sup>风险贡献验收线，因此“成功率”与“最终可用性”需区分。</p>
+    <div class="page-no">4 / 10</div></section><section class="page"><div class="running-head"><span>最优化理论与算法期末大作业</span><span>05</span></div><h1>4　算法效率与病态矩阵压力测试</h1>
+      <div class="two-col">
+        <figure class="figure compact"><img src="file:///C:/Users/Administrator/Documents/%E9%A3%8E%E9%99%A9%E5%B9%B3%E4%BB%B7%E4%B8%8E%E5%85%A8%E5%A4%A9%E5%80%99%E7%AD%96%E7%95%A5/huatai-risk-parity-replication/%E6%9C%80%E4%BC%98%E5%8C%96%E7%90%86%E8%AE%BA%E4%B8%8E%E7%AE%97%E6%B3%95%E6%9C%9F%E6%9C%AB%E5%A4%A7%E4%BD%9C%E4%B8%9A/output/figures/solver_summary.png" alt="图2　全部滚动月度协方差矩阵上的求解效率与精度"><figcaption>图2　全部滚动月度协方差矩阵上的求解效率与精度<br><span>资料来源：本课程实验程序生成。</span></figcaption></figure>
+        <figure class="figure compact"><img src="file:///C:/Users/Administrator/Documents/%E9%A3%8E%E9%99%A9%E5%B9%B3%E4%BB%B7%E4%B8%8E%E5%85%A8%E5%A4%A9%E5%80%99%E7%AD%96%E7%95%A5/huatai-risk-parity-replication/%E6%9C%80%E4%BC%98%E5%8C%96%E7%90%86%E8%AE%BA%E4%B8%8E%E7%AE%97%E6%B3%95%E6%9C%9F%E6%9C%AB%E5%A4%A7%E4%BD%9C%E4%B8%9A/output/figures/stress_test.png" alt="图3　条件数10²至10⁸下的求解稳定性（每档20次）"><figcaption>图3　条件数10²至10⁸下的求解稳定性（每档20次）<br><span>资料来源：本课程实验程序生成。</span></figcaption></figure>
+      </div>
+      <h2>4.1 滚动窗口结果</h2>
+      <p>在148个滚动月度矩阵上，L-BFGS-B成功率为100.0%，但中位迭代与耗时分别为29次和3.420 ms。SLSQP中位迭代42.5次，最大RC误差2.47e-06，显示原始非凸形式对数值设置更敏感。</p>
+      <h2>4.2 压力测试</h2>
+      <p>固定随机种子42，使用随机正交基和指定特征值谱生成9维正定矩阵。条件数达到10<sup>8</sup>时，阻尼牛顿法20次成功率为95.0%，最大RC误差为2.95e-07，仍低于1×10<sup>−6</sup>验收阈值。压力测试说明解析Hessian与可行线搜索能显著缓解病态性，但不能替代协方差正则化。</p>
+      <div class="callout"><b>算法结论：</b>阻尼牛顿法在本问题的低维、稠密且Hessian可解析场景中最有优势；若资产维数极高，存储Hessian的代价会使L-BFGS类方法更有吸引力。</div>
+      <p class="source">资料来源：output/tables/algorithm_summary.csv 与 stress_test_summary.csv；图表由程序生成。</p>
+    <div class="page-no">5 / 10</div></section><section class="page"><div class="running-head"><span>最优化理论与算法期末大作业</span><span>06</span></div><h1>5　回测设计与样本外绩效</h1>
+      <div class="method-strip"><span>过去252日</span><b>→</b><span>月末估计风险</span><b>→</b><span>下一交易日调仓</span><b>→</b><span>单边成本5 bp</span></div>
+      <p>月末只使用截至当日的历史收益，目标权重在下一交易日执行，避免未来信息；月内权重随资产收益自然漂移。组合无杠杆、只做多。对比策略为等权组合、逆下行波动率组合和EWMA半协方差风险平价。</p>
+      <figure class="figure"><img src="file:///C:/Users/Administrator/Documents/%E9%A3%8E%E9%99%A9%E5%B9%B3%E4%BB%B7%E4%B8%8E%E5%85%A8%E5%A4%A9%E5%80%99%E7%AD%96%E7%95%A5/huatai-risk-parity-replication/%E6%9C%80%E4%BC%98%E5%8C%96%E7%90%86%E8%AE%BA%E4%B8%8E%E7%AE%97%E6%B3%95%E6%9C%9F%E6%9C%AB%E5%A4%A7%E4%BD%9C%E4%B8%9A/output/figures/strategy_nav.png" alt="图4　三类资产配置策略累计净值（2014—2026年4月）"><figcaption>图4　三类资产配置策略累计净值（2014—2026年4月）<br><span>资料来源：本课程实验程序生成。</span></figcaption></figure>
+      <table class="data-table small"><thead><tr><th>策略</th><th>年化收益</th><th>年化波动</th><th>夏普</th><th>最大回撤</th><th>卡玛</th><th>年化换手</th></tr></thead><tbody><tr><td>等权组合</td><td>10.17%</td><td>9.12%</td><td>1.11</td><td>-9.56%</td><td>1.06</td><td>39.6%</td></tr><tr><td>逆下行波动率</td><td>8.38%</td><td>4.49%</td><td>1.82</td><td>-4.20%</td><td>1.99</td><td>158.5%</td></tr><tr><td>风险平价</td><td>8.20%</td><td>4.21%</td><td>1.89</td><td>-3.41%</td><td>2.41</td><td>170.2%</td></tr></tbody></table>
+      <p>验证期等权组合年化收益10.17%高于风险平价的8.20%，但其波动9.12%和最大回撤-9.56%也明显更高。风险平价夏普1.89、卡玛2.41，因此本文的主结论是“改善风险调整后收益”，而不是“保证最高收益”。</p>
+      <p class="source">资料来源：output/tables/strategy_nav.csv 与 strategy_metrics.csv；净值和指标由程序重算。</p>
+    <div class="page-no">6 / 10</div></section><section class="page"><div class="running-head"><span>最优化理论与算法期末大作业</span><span>07</span></div><h1>6　风险估计口径与年度情景</h1>
+      <div class="two-col">
+        <figure class="figure compact"><img src="file:///C:/Users/Administrator/Documents/%E9%A3%8E%E9%99%A9%E5%B9%B3%E4%BB%B7%E4%B8%8E%E5%85%A8%E5%A4%A9%E5%80%99%E7%AD%96%E7%95%A5/huatai-risk-parity-replication/%E6%9C%80%E4%BC%98%E5%8C%96%E7%90%86%E8%AE%BA%E4%B8%8E%E7%AE%97%E6%B3%95%E6%9C%9F%E6%9C%AB%E5%A4%A7%E4%BD%9C%E4%B8%9A/output/figures/estimator_comparison.png" alt="图5　三类协方差估计下的样本外风险收益"><figcaption>图5　三类协方差估计下的样本外风险收益<br><span>资料来源：本课程实验程序生成。</span></figcaption></figure>
+        <figure class="figure compact"><img src="file:///C:/Users/Administrator/Documents/%E9%A3%8E%E9%99%A9%E5%B9%B3%E4%BB%B7%E4%B8%8E%E5%85%A8%E5%A4%A9%E5%80%99%E7%AD%96%E7%95%A5/huatai-risk-parity-replication/%E6%9C%80%E4%BC%98%E5%8C%96%E7%90%86%E8%AE%BA%E4%B8%8E%E7%AE%97%E6%B3%95%E6%9C%9F%E6%9C%AB%E5%A4%A7%E4%BD%9C%E4%B8%9A/output/figures/yearly_returns.png" alt="图6　三类配置策略的年度收益情景"><figcaption>图6　三类配置策略的年度收益情景<br><span>资料来源：本课程实验程序生成。</span></figcaption></figure>
+      </div>
+      <table class="data-table small"><thead><tr><th>风险估计</th><th>年化收益</th><th>年化波动</th><th>夏普</th><th>最大回撤</th><th>年化换手</th></tr></thead><tbody><tr><td>样本协方差</td><td>8.04%</td><td>3.61%</td><td>2.16</td><td>-2.24%</td><td>50.2%</td></tr><tr><td>EWMA全协方差</td><td>8.35%</td><td>3.69%</td><td>2.19</td><td>-2.83%</td><td>162.7%</td></tr><tr><td>EWMA半协方差</td><td>8.20%</td><td>4.21%</td><td>1.89</td><td>-3.41%</td><td>170.2%</td></tr></tbody></table>
+      <h2>6.1 半协方差并非样本外最优</h2>
+      <p>样本协方差、EWMA全协方差和EWMA半协方差均使用相同窗口、调仓、成本和凸求解器。验证期中，EWMA全协方差夏普2.19，高于半协方差的1.89；样本协方差回撤也更浅。这一结果没有否定半协方差，而是说明“只强调下行方向”会改变相关结构与换手，并不必然提升样本外绩效。</p>
+      <h2>6.2 情景解释</h2>
+      <p>年度收益图显示策略相对表现会随股债商品环境变化。风险平价的结构性作用是抑制单一高波动资产主导，而不是消除宏观共同冲击。2026年数据只覆盖至4月3日，不应与完整年度直接比较。</p>
+      <div class="callout"><b>审慎结论：</b>风险估计口径是一项模型假设，应通过多估计器对照、参数敏感性和更长样本检验，而不能根据单一样本外指标宣布一种估计器永久占优。</div>
+    <div class="page-no">7 / 10</div></section><section class="page"><div class="running-head"><span>最优化理论与算法期末大作业</span><span>08</span></div><h1>7　参数敏感性与训练期选参</h1>
+      <p>对窗口{126,252,504}和衰减系数{0.90,0.94,0.97,0.99}运行12组半协方差风险平价回测。先按2014—2020年训练期夏普从高到低排序，若相同则选择最大回撤较小者；验证期不参与选择。</p>
+      <figure class="figure compact"><img src="file:///C:/Users/Administrator/Documents/%E9%A3%8E%E9%99%A9%E5%B9%B3%E4%BB%B7%E4%B8%8E%E5%85%A8%E5%A4%A9%E5%80%99%E7%AD%96%E7%95%A5/huatai-risk-parity-replication/%E6%9C%80%E4%BC%98%E5%8C%96%E7%90%86%E8%AE%BA%E4%B8%8E%E7%AE%97%E6%B3%95%E6%9C%9F%E6%9C%AB%E5%A4%A7%E4%BD%9C%E4%B8%9A/output/figures/sensitivity_heatmap.png" alt="图7　窗口与衰减系数的训练期、验证期夏普热力图"><figcaption>图7　窗口与衰减系数的训练期、验证期夏普热力图<br><span>资料来源：本课程实验程序生成。</span></figcaption></figure>
+      <table class="data-table small"><thead><tr><th>窗口/日</th><th>衰减</th><th>验证期收益</th><th>验证期夏普</th><th>验证期回撤</th></tr></thead><tbody><tr><td>126</td><td>0.90</td><td>8.94%</td><td>1.87</td><td>-3.48%</td></tr><tr><td>252</td><td>0.90</td><td>8.94%</td><td>1.87</td><td>-3.48%</td></tr><tr><td>504</td><td>0.90</td><td>8.94%</td><td>1.87</td><td>-3.48%</td></tr><tr><td>126</td><td>0.94</td><td>8.65%</td><td>1.89</td><td>-3.24%</td></tr><tr><td>252</td><td>0.94</td><td>8.65%</td><td>1.89</td><td>-3.24%</td></tr><tr><td>504</td><td>0.94</td><td>8.65%</td><td>1.89</td><td>-3.24%</td></tr><tr><td>126</td><td>0.97</td><td>8.21%</td><td>1.89</td><td>-3.44%</td></tr><tr><td>252</td><td>0.97</td><td>8.20%</td><td>1.89</td><td>-3.41%</td></tr><tr><td>504</td><td>0.97</td><td>8.20%</td><td>1.89</td><td>-3.41%</td></tr><tr><td>126</td><td>0.99</td><td>8.02%</td><td>1.91</td><td>-3.49%</td></tr><tr><td>252</td><td>0.99</td><td>8.02%</td><td>1.95</td><td>-3.13%</td></tr><tr><td>504</td><td>0.99</td><td>8.07%</td><td>1.96</td><td>-2.98%</td></tr></tbody></table>
+      <p>训练期规则锁定窗口252日、衰减0.90，训练期夏普1.96，样本外夏普1.87。默认主模型252日、0.97的样本外夏普为1.89，两者接近，说明主结论不依赖单个参数点；但不同参数的换手率差异仍会影响落地成本。</p>
+      <p class="source">资料来源：output/tables/parameter_sensitivity.csv；固定随机种子与同一交易成本设置。</p>
+    <div class="page-no">8 / 10</div></section><section class="page"><div class="running-head"><span>最优化理论与算法期末大作业</span><span>09</span></div><h1>8　代表窗口的最优权重与风险贡献</h1>
+      <figure class="figure"><img src="file:///C:/Users/Administrator/Documents/%E9%A3%8E%E9%99%A9%E5%B9%B3%E4%BB%B7%E4%B8%8E%E5%85%A8%E5%A4%A9%E5%80%99%E7%AD%96%E7%95%A5/huatai-risk-parity-replication/%E6%9C%80%E4%BC%98%E5%8C%96%E7%90%86%E8%AE%BA%E4%B8%8E%E7%AE%97%E6%B3%95%E6%9C%9F%E6%9C%AB%E5%A4%A7%E4%BD%9C%E4%B8%9A/output/figures/weights_risk_contributions.png" alt="图8　2025-12-31代表窗口的资产权重与相对风险贡献"><figcaption>图8　2025-12-31代表窗口的资产权重与相对风险贡献<br><span>资料来源：本课程实验程序生成。</span></figcaption></figure>
+      <div class="two-col weights-layout">
+        <div><table class="data-table small"><thead><tr><th>资产</th><th>权重</th><th>风险贡献</th><th>目标</th></tr></thead><tbody><tr><td>沪深300ETF</td><td>5.64%</td><td>11.1111%</td><td>11.1111%</td></tr><tr><td>中证1000ETF</td><td>4.55%</td><td>11.1111%</td><td>11.1111%</td></tr><tr><td>红利低波ETF</td><td>8.96%</td><td>11.1111%</td><td>11.1111%</td></tr><tr><td>10年国债ETF</td><td>44.96%</td><td>11.1111%</td><td>11.1111%</td></tr><tr><td>30年国债ETF</td><td>10.39%</td><td>11.1111%</td><td>11.1111%</td></tr><tr><td>有色ETF</td><td>6.69%</td><td>11.1111%</td><td>11.1111%</td></tr><tr><td>能源化工ETF</td><td>5.72%</td><td>11.1111%</td><td>11.1111%</td></tr><tr><td>豆粕ETF</td><td>8.17%</td><td>11.1111%</td><td>11.1111%</td></tr><tr><td>黄金ETF</td><td>4.92%</td><td>11.1111%</td><td>11.1111%</td></tr></tbody></table></div>
+        <div><h2>8.1 为什么债券权重大</h2><p>风险预算约束的是方差贡献，而非名义资金。低波动债券需要更高权重，才能达到与股票、黄金和商品相同的边际风险贡献。因此，“债券权重大”与“九类资产风险贡献均约11.11%”并不矛盾。</p><h2>8.2 最优解诊断</h2><p>代表窗口全部权重严格为正、权重和为1。每类资产风险贡献与目标11.11%的偏差处于数值容差内。滚动回测中风险平价平均最大权重为44.28%，说明风险均衡不等同于资本均衡，必要时可进一步加入权重上限。</p></div>
+      </div>
+      <p class="source">资料来源：output/tables/representative_optimal_solution.csv；协方差窗口截至2025-12-31。</p>
+    <div class="page-no">9 / 10</div></section><section class="page"><div class="running-head"><span>最优化理论与算法期末大作业</span><span>10</span></div><h1>9　结论、局限与启示</h1>
+      <h2>9.1 主要结论</h2>
+      <ol class="conclusions"><li><b>模型：</b>对数障碍凸重构将等风险贡献转化为严格凸问题，加入10<sup>−8</sup>I后最优解唯一，KKT条件直接给出风险预算等式。</li><li><b>算法：</b>自实现阻尼牛顿法利用解析Hessian、正权重步长上界和Armijo线搜索，在滚动窗口中以8次中位迭代达到高精度，并通过条件数10<sup>8</sup>压力测试。</li><li><b>实证：</b>风险平价验证期年化收益8.20%、波动4.21%、夏普1.89、最大回撤-3.41%。相对等权组合，优势主要是降低波动和回撤。</li><li><b>稳健性：</b>参数网格结果较平滑，但协方差估计对结论影响显著，EWMA半协方差在该样本外并非最优估计器。</li></ol>
+      <h2>9.2 局限与下一步</h2>
+      <p>ETF成立前指数代理、固定交易成本、零无风险利率、2026年不完整年度和有限参数网格限制外推。后续可加入Ledoit–Wolf收缩、权重上限、换手惩罚与滚动交叉验证，并考察股债相关性上升时的稳健性。</p>
+      <h2>9.3 复现说明</h2>
+      <p>在项目目录执行 <code>python run.py</code> 即可重新清洗数据、运行全部实验、生成8张图和本PDF；执行 <code>python -m unittest discover -s tests -v</code> 运行梯度/Hessian、闭式解、三算法一致性、无未来数据和交易成本测试。所有配置集中于 <code>config.json</code>。</p>
+      <h2>参考文献</h2>
+      <ol class="references"><li>Maillard, S., Roncalli, T., &amp; Teïletche, J. (2010). On the Properties of Equally-Weighted Risk Contributions Portfolios. <i>Journal of Portfolio Management</i>.</li><li>Spinu, F. (2013). An Algorithm for Computing Risk Parity Weights.</li><li>Nocedal, J., &amp; Wright, S. (2006). <i>Numerical Optimization</i> (2nd ed.). Springer.</li><li>华泰研究（2025）：《从资产配置走向因子配置：中国版全天候增强策略》。</li><li>本项目历史版本：资产风险平价策略v0.01（SLSQP）与v0.05（凸优化）。</li></ol>
+      <div class="final-note">报告、图表、结果表与测试均由本仓库代码重新生成；研报仅用于研究背景和方法引用。</div>
+    <div class="page-no">10 / 10</div></section></body></html>

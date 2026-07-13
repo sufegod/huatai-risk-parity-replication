@@ -1,0 +1,198 @@
+{
+  "validation_erc": {
+    "strategy": "erc",
+    "period": "validation",
+    "observations": 1271,
+    "cumulative_return": 0.4883057414856826,
+    "annual_return": 0.0820305306547584,
+    "annual_volatility": 0.04208877907076626,
+    "sharpe": 1.8945262018641795,
+    "max_drawdown": -0.03408635797199244,
+    "calmar": 2.406550172422645,
+    "monthly_win_rate": 0.71875,
+    "annual_turnover": 1.7015725149260064,
+    "average_max_weight": 0.4428283510370935,
+    "average_rc_error": 9.443392812516493e-11
+  },
+  "validation_equal_weight": {
+    "strategy": "equal_weight",
+    "period": "validation",
+    "observations": 1271,
+    "cumulative_return": 0.6296020815652581,
+    "annual_return": 0.10166415205602508,
+    "annual_volatility": 0.0912035691776167,
+    "sharpe": 1.1074565400462615,
+    "max_drawdown": -0.0956202250332765,
+    "calmar": 1.0632076218252493,
+    "monthly_win_rate": 0.65625,
+    "annual_turnover": 0.3955301512537249,
+    "average_max_weight": 0.11111111111111113,
+    "average_rc_error": null
+  },
+  "newton_summary": {
+    "method": "newton",
+    "observations": 148,
+    "success_rate": 0.9797297297297297,
+    "median_iterations": 8.0,
+    "median_runtime_ms": 0.30384998535737395,
+    "p95_runtime_ms": 0.45014501374680554,
+    "median_rc_error": 1.0943815298425363e-12,
+    "max_rc_error": 2.1389505444613377e-09,
+    "max_weight_sum_error": 2.220446049250313e-16
+  },
+  "lbfgsb_summary": {
+    "method": "lbfgsb",
+    "observations": 148,
+    "success_rate": 1.0,
+    "median_iterations": 29.0,
+    "median_runtime_ms": 3.420299995923415,
+    "p95_runtime_ms": 6.293034987174908,
+    "median_rc_error": 1.4740418260994481e-09,
+    "max_rc_error": 1.2611040101084825e-08,
+    "max_weight_sum_error": 2.220446049250313e-16
+  },
+  "slsqp_summary": {
+    "method": "slsqp",
+    "observations": 148,
+    "success_rate": 0.9527027027027027,
+    "median_iterations": 42.5,
+    "median_runtime_ms": 6.700350000755861,
+    "p95_runtime_ms": 9.11607002199162,
+    "median_rc_error": 2.98549907747081e-07,
+    "max_rc_error": 2.4676776982507365e-06,
+    "max_weight_sum_error": 2.220446049250313e-16
+  },
+  "stress_newton_1e8": {
+    "condition_number": 100000000.0,
+    "method": "newton",
+    "success_rate": 0.95,
+    "median_iterations": 13.0,
+    "median_runtime_ms": 0.4850999976042658,
+    "median_rc_error": 5.82822470840405e-11,
+    "max_rc_error": 2.9458570643958737e-07
+  },
+  "estimator_validation": {
+    "sample": {
+      "annual_return": 0.08036071833347602,
+      "annual_volatility": 0.03605938742404103,
+      "sharpe": 2.1618960585064104,
+      "max_drawdown": -0.022409787864872688
+    },
+    "ewma_full": {
+      "annual_return": 0.08345323045786301,
+      "annual_volatility": 0.03693408387837489,
+      "sharpe": 2.1889835943292684,
+      "max_drawdown": -0.028275884154097763
+    },
+    "ewma_semi": {
+      "annual_return": 0.0820305306547584,
+      "annual_volatility": 0.04208877907076626,
+      "sharpe": 1.8945262018641795,
+      "max_drawdown": -0.03408635797199244
+    }
+  },
+  "selected_parameter": {
+    "selection_period": "train",
+    "selection_rule": "highest Sharpe, then less severe maximum drawdown",
+    "decay": 0.9,
+    "window": 252,
+    "train_sharpe": 1.9574860525367586,
+    "train_max_drawdown": -0.06081628850184595,
+    "validation_sharpe": 1.8699615980697033,
+    "validation_max_drawdown": -0.03483768309149082
+  },
+  "data_quality": {
+    "source": "数据/原始数据/ETF风险平价回测数据.xlsx",
+    "sheet_index": 0,
+    "rows": 3216,
+    "assets": 9,
+    "start_date": "2013-01-04",
+    "end_date": "2026-04-03",
+    "duplicate_dates": 0,
+    "exact_duplicate_rows": 0,
+    "missing_cells_before_fill": 3,
+    "missing_cells_after_fill": 0,
+    "min_return": -0.100052,
+    "max_return": 0.099913,
+    "date_monotonic": true,
+    "fill_rule": "three isolated missing asset-day returns filled with zero",
+    "known_limitation": "pre-ETF-history uses project-provided index proxies"
+  },
+  "chart_map": [
+    {
+      "section": "实证结果",
+      "question": "风险平价是否改善风险调整后收益",
+      "family": "Trend",
+      "type": "multi-series line",
+      "path": "output/figures/strategy_nav.png"
+    },
+    {
+      "section": "算法比较",
+      "question": "三类算法的效率和精度如何",
+      "family": "Comparison",
+      "type": "paired bars",
+      "path": "output/figures/solver_summary.png"
+    },
+    {
+      "section": "算法比较",
+      "question": "代表窗口中误差如何随迭代下降",
+      "family": "Trend",
+      "type": "semilog convergence",
+      "path": "output/figures/solver_convergence.png"
+    },
+    {
+      "section": "最优解分析",
+      "question": "不等权如何实现等风险贡献",
+      "family": "Comparison",
+      "type": "grouped bar",
+      "path": "output/figures/weights_risk_contributions.png"
+    },
+    {
+      "section": "稳健性",
+      "question": "病态矩阵是否破坏求解精度",
+      "family": "Uncertainty",
+      "type": "log-log line",
+      "path": "output/figures/stress_test.png"
+    },
+    {
+      "section": "风险估计",
+      "question": "半协方差相对全协方差是否稳健",
+      "family": "Comparison",
+      "type": "bar",
+      "path": "output/figures/estimator_comparison.png"
+    },
+    {
+      "section": "敏感性",
+      "question": "结论是否依赖单点参数",
+      "family": "Matrix",
+      "type": "annotated heatmap",
+      "path": "output/figures/sensitivity_heatmap.png"
+    },
+    {
+      "section": "情景分析",
+      "question": "不同年份下策略表现是否一致",
+      "family": "Comparison",
+      "type": "grouped bars",
+      "path": "output/figures/yearly_returns.png"
+    }
+  ],
+  "config": {
+    "title": "基于 EWMA 半协方差的风险平价资产配置优化——凸重构、阻尼牛顿法与实证分析",
+    "course": "最优化理论与算法",
+    "student_name": "请填写",
+    "student_id": "请填写",
+    "source_excel": "数据/原始数据/ETF风险平价回测数据.xlsx",
+    "source_sheet_index": 0,
+    "window": 252,
+    "decay": 0.97,
+    "ridge": 1e-08,
+    "fee_rate": 0.0005,
+    "train_start": "2014-01-01",
+    "train_end": "2020-12-31",
+    "validation_start": "2021-01-01",
+    "validation_end": "2026-04-03",
+    "solver_tol": 1e-10,
+    "solver_max_iter": 1000,
+    "random_seed": 42
+  }
+}

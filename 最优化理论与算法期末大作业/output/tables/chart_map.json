@@ -1,0 +1,58 @@
+[
+  {
+    "section": "实证结果",
+    "question": "风险平价是否改善风险调整后收益",
+    "family": "Trend",
+    "type": "multi-series line",
+    "path": "output/figures/strategy_nav.png"
+  },
+  {
+    "section": "算法比较",
+    "question": "三类算法的效率和精度如何",
+    "family": "Comparison",
+    "type": "paired bars",
+    "path": "output/figures/solver_summary.png"
+  },
+  {
+    "section": "算法比较",
+    "question": "代表窗口中误差如何随迭代下降",
+    "family": "Trend",
+    "type": "semilog convergence",
+    "path": "output/figures/solver_convergence.png"
+  },
+  {
+    "section": "最优解分析",
+    "question": "不等权如何实现等风险贡献",
+    "family": "Comparison",
+    "type": "grouped bar",
+    "path": "output/figures/weights_risk_contributions.png"
+  },
+  {
+    "section": "稳健性",
+    "question": "病态矩阵是否破坏求解精度",
+    "family": "Uncertainty",
+    "type": "log-log line",
+    "path": "output/figures/stress_test.png"
+  },
+  {
+    "section": "风险估计",
+    "question": "半协方差相对全协方差是否稳健",
+    "family": "Comparison",
+    "type": "bar",
+    "path": "output/figures/estimator_comparison.png"
+  },
+  {
+    "section": "敏感性",
+    "question": "结论是否依赖单点参数",
+    "family": "Matrix",
+    "type": "annotated heatmap",
+    "path": "output/figures/sensitivity_heatmap.png"
+  },
+  {
+    "section": "情景分析",
+    "question": "不同年份下策略表现是否一致",
+    "family": "Comparison",
+    "type": "grouped bars",
+    "path": "output/figures/yearly_returns.png"
+  }
+]

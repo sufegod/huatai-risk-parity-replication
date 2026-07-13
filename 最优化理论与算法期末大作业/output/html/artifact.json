@@ -1,0 +1,3518 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "基于 EWMA 半协方差的风险平价资产配置优化——凸重构、阻尼牛顿法与实证分析",
+    "generatedAt": "2026-07-13T22:00:00+08:00",
+    "cards": [
+      {
+        "id": "validation_return",
+        "dataset": "headline_metrics",
+        "sourceId": "headline_query",
+        "description": "风险平价组合在样本外验证期的年化收益。",
+        "metrics": [
+          {
+            "label": "验证期年化收益",
+            "field": "annual_return",
+            "format": "percent"
+          }
+        ]
+      },
+      {
+        "id": "validation_sharpe",
+        "dataset": "headline_metrics",
+        "sourceId": "headline_query",
+        "description": "以无风险利率为 0 计算的年化夏普比率。",
+        "metrics": [
+          {
+            "label": "验证期夏普比率",
+            "field": "sharpe",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "validation_drawdown",
+        "dataset": "headline_metrics",
+        "sourceId": "headline_query",
+        "description": "验证期累计净值的最深峰谷回撤。",
+        "metrics": [
+          {
+            "label": "验证期最大回撤",
+            "field": "max_drawdown",
+            "format": "percent"
+          }
+        ]
+      }
+    ],
+    "charts": [
+      {
+        "id": "nav_chart",
+        "title": "三类资产配置策略累计净值",
+        "description": "2014年1月至2026年4月，月末观察、下一交易日调仓，含单边5bp成本。",
+        "type": "line",
+        "dataset": "nav_monthly",
+        "sourceId": "nav_query",
+        "encodings": {
+          "x": {
+            "field": "date",
+            "type": "temporal"
+          },
+          "y": {
+            "field": "nav",
+            "type": "quantitative"
+          },
+          "color": {
+            "field": "strategy",
+            "type": "nominal"
+          }
+        }
+      },
+      {
+        "id": "algorithm_chart",
+        "title": "三类求解器的中位迭代次数",
+        "description": "全部滚动月度EWMA半协方差矩阵。",
+        "type": "bar",
+        "dataset": "algorithm_summary",
+        "sourceId": "algorithm_query",
+        "encodings": {
+          "x": {
+            "field": "algorithm",
+            "type": "nominal"
+          },
+          "y": {
+            "field": "median_iterations",
+            "type": "quantitative"
+          }
+        }
+      },
+      {
+        "id": "sensitivity_chart",
+        "title": "参数组合的样本外夏普比率",
+        "description": "验证期为2021年1月至2026年4月；参数选择只使用训练期。",
+        "type": "heatmap",
+        "dataset": "sensitivity_validation",
+        "sourceId": "sensitivity_query",
+        "encodings": {
+          "x": {
+            "field": "window_label",
+            "type": "nominal"
+          },
+          "y": {
+            "field": "decay_label",
+            "type": "nominal"
+          },
+          "color": {
+            "field": "sharpe",
+            "type": "quantitative"
+          }
+        }
+      },
+      {
+        "id": "optimal_chart",
+        "title": "代表窗口的组合权重与风险贡献",
+        "description": "目标风险贡献均为11.11%，低波动债券获得较高名义权重。",
+        "type": "bar",
+        "dataset": "optimal_solution",
+        "sourceId": "optimal_query",
+        "encodings": {
+          "x": {
+            "field": "asset",
+            "type": "nominal"
+          },
+          "y": {
+            "field": "value",
+            "type": "quantitative"
+          },
+          "color": {
+            "field": "measure",
+            "type": "nominal"
+          }
+        }
+      },
+      {
+        "id": "stress_chart",
+        "title": "条件数1e8下的最大风险贡献误差",
+        "description": "9维随机正定矩阵，每种算法固定种子重复20次。",
+        "type": "bar",
+        "dataset": "stress_view",
+        "sourceId": "stress_query",
+        "encodings": {
+          "x": {
+            "field": "algorithm",
+            "type": "nominal"
+          },
+          "y": {
+            "field": "max_rc_error",
+            "type": "quantitative"
+          }
+        }
+      }
+    ],
+    "tables": [
+      {
+        "id": "performance_table",
+        "title": "训练期与验证期绩效",
+        "description": "收益和风险按252个交易日年化；2026年为不完整年度。",
+        "dataset": "performance",
+        "sourceId": "performance_query",
+        "defaultSort": {
+          "field": "period",
+          "direction": "asc"
+        },
+        "columns": [
+          {
+            "field": "strategy",
+            "label": "策略"
+          },
+          {
+            "field": "period",
+            "label": "区间"
+          },
+          {
+            "field": "annual_return",
+            "label": "年化收益",
+            "format": "percent"
+          },
+          {
+            "field": "annual_volatility",
+            "label": "年化波动",
+            "format": "percent"
+          },
+          {
+            "field": "sharpe",
+            "label": "夏普",
+            "format": "number"
+          },
+          {
+            "field": "max_drawdown",
+            "label": "最大回撤",
+            "format": "percent"
+          },
+          {
+            "field": "calmar",
+            "label": "卡玛",
+            "format": "number"
+          },
+          {
+            "field": "annual_turnover",
+            "label": "年化换手",
+            "format": "percent"
+          }
+        ]
+      },
+      {
+        "id": "algorithm_table",
+        "title": "滚动窗口算法精度与效率",
+        "description": "成功要求满足权重约束且最大风险贡献误差不超过1e-6。",
+        "dataset": "algorithm_summary",
+        "sourceId": "algorithm_query",
+        "defaultSort": {
+          "field": "median_iterations",
+          "direction": "asc"
+        },
+        "columns": [
+          {
+            "field": "algorithm",
+            "label": "算法"
+          },
+          {
+            "field": "success_rate",
+            "label": "成功率",
+            "format": "percent"
+          },
+          {
+            "field": "median_iterations",
+            "label": "中位迭代",
+            "format": "number"
+          },
+          {
+            "field": "median_runtime_ms",
+            "label": "中位耗时(ms)",
+            "format": "number"
+          },
+          {
+            "field": "median_rc_error",
+            "label": "中位RC误差",
+            "format": "number"
+          },
+          {
+            "field": "max_rc_error",
+            "label": "最大RC误差",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "estimator_table",
+        "title": "风险估计方法的样本外表现",
+        "description": "窗口252日、EWMA衰减0.97；样本协方差不使用衰减参数。",
+        "dataset": "estimator_validation",
+        "sourceId": "estimator_query",
+        "defaultSort": {
+          "field": "sharpe",
+          "direction": "desc"
+        },
+        "columns": [
+          {
+            "field": "estimator_name",
+            "label": "风险估计"
+          },
+          {
+            "field": "annual_return",
+            "label": "年化收益",
+            "format": "percent"
+          },
+          {
+            "field": "annual_volatility",
+            "label": "年化波动",
+            "format": "percent"
+          },
+          {
+            "field": "sharpe",
+            "label": "夏普",
+            "format": "number"
+          },
+          {
+            "field": "max_drawdown",
+            "label": "最大回撤",
+            "format": "percent"
+          }
+        ]
+      },
+      {
+        "id": "quality_table",
+        "title": "数据质量检查摘要",
+        "description": "原始数据覆盖2013-01-04至2026-04-03。",
+        "dataset": "data_quality",
+        "sourceId": "quality_query",
+        "defaultSort": {
+          "field": "check",
+          "direction": "asc"
+        },
+        "columns": [
+          {
+            "field": "check",
+            "label": "检查项"
+          },
+          {
+            "field": "value",
+            "label": "数值",
+            "format": "number"
+          },
+          {
+            "field": "result",
+            "label": "结论"
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "id": "etf_data",
+        "label": "ETF风险平价回测数据",
+        "path": "data/etf_returns.csv",
+        "description": "项目原始 Excel 第一张工作表清洗后的 9 资产日收益。"
+      },
+      {
+        "id": "derived_results",
+        "label": "课程实验派生结果",
+        "path": "output/tables/analysis_summary.json",
+        "description": "阻尼牛顿法、算法比较、回测、稳健性和敏感性实验的可复现输出。"
+      },
+      {
+        "id": "research_report",
+        "label": "华泰研究：中国版全天候增强策略",
+        "path": "策略研报来源/金工_ 从资产配置走向因子配置：中国版全天候增强策略.pdf",
+        "description": "用于风险平价与宏观因子配置的研究背景，不复制其中图表。"
+      },
+      {
+        "id": "headline_query",
+        "label": "从策略绩效表抽取风险平价验证期核心指标。",
+        "path": "output/html/report_queries.sql",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "sql": "SELECT annual_return, sharpe, max_drawdown\nFROM read_csv_auto('output/tables/strategy_metrics.csv', header=true)\nWHERE strategy='erc' AND period='validation'",
+          "description": "从策略绩效表抽取风险平价验证期核心指标。",
+          "tables_used": [
+            "output/tables/*.csv",
+            "data/etf_returns.csv"
+          ],
+          "executed_at": "2026-07-13T22:00:00+08:00"
+        }
+      },
+      {
+        "id": "nav_query",
+        "label": "将日净值转换为月末长表，供累计净值图使用。",
+        "path": "output/html/report_queries.sql",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "sql": "WITH long_data AS (\n  UNPIVOT (SELECT * FROM read_csv_auto('output/tables/strategy_nav.csv', header=true))\n  ON equal_weight, inverse_downside_vol, erc\n  INTO NAME strategy VALUE nav\n), ranked AS (\n  SELECT CAST(date AS DATE) AS date, strategy, nav,\n         row_number() OVER (\n           PARTITION BY date_trunc('month', CAST(date AS DATE)), strategy\n           ORDER BY CAST(date AS DATE) DESC\n         ) AS rn\n  FROM long_data\n)\nSELECT strftime(date, '%Y-%m-%d') AS date,\n       CASE strategy\n         WHEN 'equal_weight' THEN '等权组合'\n         WHEN 'inverse_downside_vol' THEN '逆下行波动率'\n         ELSE '风险平价'\n       END AS strategy,\n       nav\nFROM ranked WHERE rn=1 ORDER BY date, strategy",
+          "description": "将日净值转换为月末长表，供累计净值图使用。",
+          "tables_used": [
+            "output/tables/*.csv",
+            "data/etf_returns.csv"
+          ],
+          "executed_at": "2026-07-13T22:00:00+08:00"
+        }
+      },
+      {
+        "id": "performance_query",
+        "label": "抽取训练期和验证期的三策略绩效。",
+        "path": "output/html/report_queries.sql",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "sql": "SELECT CASE strategy\n         WHEN 'equal_weight' THEN '等权组合'\n         WHEN 'inverse_downside_vol' THEN '逆下行波动率'\n         ELSE '风险平价'\n       END AS strategy,\n       CASE period WHEN 'train' THEN '训练期' ELSE '验证期' END AS period,\n       annual_return, annual_volatility, sharpe, max_drawdown, calmar, annual_turnover\nFROM read_csv_auto('output/tables/strategy_metrics.csv', header=true)\nWHERE period IN ('train', 'validation')\nORDER BY period, strategy",
+          "description": "抽取训练期和验证期的三策略绩效。",
+          "tables_used": [
+            "output/tables/*.csv",
+            "data/etf_returns.csv"
+          ],
+          "executed_at": "2026-07-13T22:00:00+08:00"
+        }
+      },
+      {
+        "id": "algorithm_query",
+        "label": "抽取滚动窗口求解器效率与精度摘要。",
+        "path": "output/html/report_queries.sql",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "sql": "SELECT *, CASE method\n         WHEN 'newton' THEN '阻尼牛顿法'\n         WHEN 'lbfgsb' THEN 'L-BFGS-B'\n         ELSE 'SLSQP'\n       END AS algorithm\nFROM read_csv_auto('output/tables/algorithm_summary.csv', header=true)\nORDER BY method",
+          "description": "抽取滚动窗口求解器效率与精度摘要。",
+          "tables_used": [
+            "output/tables/*.csv",
+            "data/etf_returns.csv"
+          ],
+          "executed_at": "2026-07-13T22:00:00+08:00"
+        }
+      },
+      {
+        "id": "sensitivity_query",
+        "label": "抽取12组参数的样本外敏感性结果。",
+        "path": "output/html/report_queries.sql",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "sql": "SELECT *, CAST(CAST(\"window\" AS INTEGER) AS VARCHAR) AS window_label,\n       printf('%.2f', decay) AS decay_label\nFROM read_csv_auto('output/tables/parameter_sensitivity.csv', header=true)\nWHERE period='validation'\nORDER BY decay, \"window\"",
+          "description": "抽取12组参数的样本外敏感性结果。",
+          "tables_used": [
+            "output/tables/*.csv",
+            "data/etf_returns.csv"
+          ],
+          "executed_at": "2026-07-13T22:00:00+08:00"
+        }
+      },
+      {
+        "id": "optimal_query",
+        "label": "将代表窗口权重和风险贡献转换为长表。",
+        "path": "output/html/report_queries.sql",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "sql": "SELECT asset,\n       CASE measure WHEN 'weight' THEN '组合权重' ELSE '风险贡献' END AS measure,\n       value\nFROM (\n  UNPIVOT (\n    SELECT asset, weight, risk_contribution\n    FROM read_csv_auto('output/tables/representative_optimal_solution.csv', header=true)\n  ) ON weight, risk_contribution INTO NAME measure VALUE value\n)\nORDER BY asset, measure",
+          "description": "将代表窗口权重和风险贡献转换为长表。",
+          "tables_used": [
+            "output/tables/*.csv",
+            "data/etf_returns.csv"
+          ],
+          "executed_at": "2026-07-13T22:00:00+08:00"
+        }
+      },
+      {
+        "id": "estimator_query",
+        "label": "抽取三类风险估计方法的样本外表现。",
+        "path": "output/html/report_queries.sql",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "sql": "SELECT *, CASE estimator\n         WHEN 'sample' THEN '样本协方差'\n         WHEN 'ewma_full' THEN 'EWMA全协方差'\n         ELSE 'EWMA半协方差'\n       END AS estimator_name\nFROM read_csv_auto('output/tables/estimator_comparison.csv', header=true)\nWHERE period='validation'\nORDER BY estimator",
+          "description": "抽取三类风险估计方法的样本外表现。",
+          "tables_used": [
+            "output/tables/*.csv",
+            "data/etf_returns.csv"
+          ],
+          "executed_at": "2026-07-13T22:00:00+08:00"
+        }
+      },
+      {
+        "id": "stress_query",
+        "label": "抽取条件数1e8时的病态矩阵压力测试结果。",
+        "path": "output/html/report_queries.sql",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "sql": "SELECT *, CASE method\n         WHEN 'newton' THEN '阻尼牛顿法'\n         WHEN 'lbfgsb' THEN 'L-BFGS-B'\n         ELSE 'SLSQP'\n       END AS algorithm\nFROM read_csv_auto('output/tables/stress_test_summary.csv', header=true)\nWHERE condition_number=(\n  SELECT max(condition_number)\n  FROM read_csv_auto('output/tables/stress_test_summary.csv', header=true)\n)\nORDER BY method",
+          "description": "抽取条件数1e8时的病态矩阵压力测试结果。",
+          "tables_used": [
+            "output/tables/*.csv",
+            "data/etf_returns.csv"
+          ],
+          "executed_at": "2026-07-13T22:00:00+08:00"
+        }
+      },
+      {
+        "id": "quality_query",
+        "label": "从清洗收益和质量概要复算行数、资产数、重复与缺失。",
+        "path": "output/html/report_queries.sql",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "sql": "WITH clean AS (\n  SELECT * FROM read_csv_auto('data/etf_returns.csv', header=true)\n), long_clean AS (\n  UNPIVOT clean ON COLUMNS(* EXCLUDE (date)) INTO NAME asset VALUE daily_return\n), profile AS (\n  SELECT * FROM read_csv_auto('output/tables/data_quality_profile.csv', header=true)\n)\nSELECT '数据行数' AS check, (SELECT count(*) FROM clean) AS value, '通过' AS result\nUNION ALL SELECT '资产数量', (SELECT count(DISTINCT asset) FROM long_clean), '通过'\nUNION ALL SELECT '重复日期', (SELECT count(*)-count(DISTINCT date) FROM clean), '通过'\nUNION ALL SELECT '清洗前缺失单元格', (SELECT sum(missing_before_fill) FROM profile), '已按0收益处理'\nUNION ALL SELECT '清洗后缺失单元格', (SELECT count(*) FROM long_clean WHERE daily_return IS NULL), '通过'",
+          "description": "从清洗收益和质量概要复算行数、资产数、重复与缺失。",
+          "tables_used": [
+            "output/tables/*.csv",
+            "data/etf_returns.csv"
+          ],
+          "executed_at": "2026-07-13T22:00:00+08:00"
+        }
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# 基于 EWMA 半协方差的风险平价资产配置优化——凸重构、阻尼牛顿法与实证分析\n\n**课程：** 最优化理论与算法  \n**姓名：** 请填写　　**学号：** 请填写  \n**数据区间：** 2013-01-04 至 2026-04-03　　**完成日期：** 2026年7月"
+      },
+      {
+        "id": "technical_summary",
+        "type": "markdown",
+        "body": "## 技术摘要\n\n**凸重构得到稳定、可审计的等风险贡献解。** 在3216个交易日、9类资产上，自实现阻尼牛顿法的滚动窗口中位迭代次数为8次，最大风险贡献误差为2.14e-09。\n\n**样本外结果支持降低波动而非追求最高绝对收益。** 2021年至2026年4月，风险平价组合年化收益8.20%、年化波动4.21%、夏普1.89、最大回撤-3.41%；同期等权组合夏普为1.11。\n\n**参数并非越接近1越好。** 训练期规则选择窗口252日、衰减系数0.90；其样本外夏普为1.87。参数网格用于稳健性检查，不替代项目默认的252日与0.97主结论。",
+        "sourceId": "derived_results"
+      },
+      {
+        "id": "headline_metrics",
+        "type": "metric-strip",
+        "cardIds": [
+          "validation_return",
+          "validation_sharpe",
+          "validation_drawdown"
+        ]
+      },
+      {
+        "id": "key_findings",
+        "type": "markdown",
+        "body": "## 风险平价的价值主要体现在风险调整后收益\n\n累计净值用于比较长期路径，但不能单独证明算法优越。等权组合暴露于高波动资产，逆下行波动率只利用对角风险，风险平价则进一步利用资产间相关性并约束各资产风险贡献。下图与后续绩效表共同回答收益、波动和回撤三项问题。"
+      },
+      {
+        "id": "nav_chart_block",
+        "type": "chart",
+        "chartId": "nav_chart"
+      },
+      {
+        "id": "nav_interpretation",
+        "type": "markdown",
+        "sourceId": "derived_results",
+        "body": "风险平价验证期夏普为**1.89**，等权组合为**1.11**。这一差异是历史样本中的描述性结果，不代表未来收益保证；评价重点是同一交易成本与调仓规则下的风险控制。"
+      },
+      {
+        "id": "scope_data",
+        "type": "markdown",
+        "sourceId": "etf_data",
+        "body": "## 数据完整，但代理填充限制外推解释\n\n数据包含9类股票、债券、商品和黄金代理资产，共3216个交易日。原始百分数收益统一除以100；3个孤立缺失单元格按0收益处理；日期无重复且严格升序。训练期为2014-2020年，验证期为2021年至2026年4月3日。ETF成立前由项目提供的指数代理补齐，因此结果是模型实验而非可直接交易业绩。"
+      },
+      {
+        "id": "quality_table_block",
+        "type": "table",
+        "tableId": "quality_table"
+      },
+      {
+        "id": "model_specification",
+        "type": "markdown",
+        "body": "## 对数障碍凸模型把等风险贡献转化为唯一解\n\n组合方差为 σ²(w)=wᵀΣw，边际风险为 (Σw)ᵢ，资产风险贡献为 RCᵢ=wᵢ(Σw)ᵢ。原始模型最小化 ∑ᵢ[RCᵢ-σ²(w)/n]²，并满足 wᵢ≥0、∑ᵢwᵢ=1。该目标为四次非凸函数且量级随协方差缩放。\n\n令 bᵢ=1/n，改求 minₓ ½xᵀΣx-∑ᵢbᵢln(xᵢ)，x>0，再以 w=x/(1ᵀx) 归一化。梯度为 Σx-b/x，Hessian为 Σ+diag(b/x²)。加入10⁻⁸I后Σ正定，Hessian严格正定，故最优解唯一。一阶条件给出 xᵢ(Σx)ᵢ=bᵢ，归一化不会改变相对风险贡献，因此得到等风险贡献解。"
+      },
+      {
+        "id": "algorithm_method",
+        "type": "markdown",
+        "body": "## 阻尼牛顿法直接利用曲率并保持正权重\n\n每轮计算 Newton 方向 p=-H⁻¹g；先由 x+αp>0 得到可行步长上界，再以 Armijo 条件 f(x+αp)≤f(x)+10⁻⁴αgᵀp 回溯。梯度无穷范数不超过10⁻¹⁰时停止。L-BFGS-B使用相同凸目标和解析梯度；SLSQP直接求原始带等式约束模型，并按协方差尺度标准化目标值。"
+      },
+      {
+        "id": "algorithm_chart_block",
+        "type": "chart",
+        "chartId": "algorithm_chart"
+      },
+      {
+        "id": "algorithm_interpretation",
+        "type": "markdown",
+        "sourceId": "derived_results",
+        "body": "阻尼牛顿法滚动窗口成功率为**97.97%**，中位耗时**0.304毫秒**；L-BFGS-B中位迭代29次，SLSQP中位迭代42次。耗时受Python与硬件影响，误差与约束满足度才是跨环境可比较指标。"
+      },
+      {
+        "id": "algorithm_table_block",
+        "type": "table",
+        "tableId": "algorithm_table"
+      },
+      {
+        "id": "stress_method",
+        "type": "markdown",
+        "sourceId": "derived_results",
+        "body": "## 病态矩阵揭示算法稳定性边界\n\n固定随机种子42生成条件数10²至10⁸的9维正定矩阵，每档重复20次。条件数10⁸时，阻尼牛顿法最大风险贡献误差为**2.95e-07**。该实验隔离了收益序列和回测规则，仅检验数值求解器对协方差病态性的敏感程度。"
+      },
+      {
+        "id": "stress_chart_block",
+        "type": "chart",
+        "chartId": "stress_chart"
+      },
+      {
+        "id": "backtest_design",
+        "type": "markdown",
+        "body": "## 回测严格使用月末已知信息\n\n每个月末使用截至当日的过去252个交易日估计风险，目标权重在下一交易日执行；月内权重按资产收益自然漂移。调仓成本为单边换手额的0.05%，无杠杆、只做多、无风险利率设为0。年化收益、波动、夏普、最大回撤、卡玛、月度胜率、年化换手和最大权重均由同一日收益序列计算。"
+      },
+      {
+        "id": "performance_table_block",
+        "type": "table",
+        "tableId": "performance_table"
+      },
+      {
+        "id": "risk_estimation",
+        "type": "markdown",
+        "sourceId": "derived_results",
+        "body": "## 半协方差强调损失方向，但结论依赖估计口径\n\n样本协方差等权对待历史，EWMA全协方差提高近期权重，EWMA半协方差进一步将正收益截为0。三种方法使用完全相同的调仓、成本和求解器，因此样本外差异可归因于风险输入，而不是交易规则。"
+      },
+      {
+        "id": "estimator_table_block",
+        "type": "table",
+        "tableId": "estimator_table"
+      },
+      {
+        "id": "sensitivity_method",
+        "type": "markdown",
+        "body": "## 训练期选参后再观察样本外，避免全样本反向挑选\n\n对衰减系数{0.90,0.94,0.97,0.99}和窗口{126,252,504}运行12组实验。只按2014-2020年训练期夏普排序，夏普相同时选择回撤较小者；2021年后的结果只用于验证。"
+      },
+      {
+        "id": "sensitivity_chart_block",
+        "type": "chart",
+        "chartId": "sensitivity_chart"
+      },
+      {
+        "id": "sensitivity_interpretation",
+        "type": "markdown",
+        "sourceId": "derived_results",
+        "body": "训练期选择窗口**252日**、衰减系数**0.90**，训练期夏普1.96、验证期夏普1.87。报告仍以项目默认252日、0.97作为主模型，避免把参数搜索结果包装成确定性最优参数。"
+      },
+      {
+        "id": "optimal_solution",
+        "type": "markdown",
+        "body": "## 等风险贡献不等于等权配置\n\n债券日波动较低，为达到与股票、商品相同的风险贡献，需要配置更高名义权重。因此风险平价可能形成高债券权重，但每类资产的方差贡献仍接近11.11%。这也说明只看权重集中度会误判组合的真实风险分散程度。"
+      },
+      {
+        "id": "optimal_chart_block",
+        "type": "chart",
+        "chartId": "optimal_chart"
+      },
+      {
+        "id": "limitations_next",
+        "type": "markdown",
+        "body": "## 结论、局限与下一步\n\n1. 对数障碍凸重构给出唯一全局解，阻尼牛顿法以少量迭代达到严格风险贡献误差。  \n2. 历史样本中，风险平价主要通过降低波动和回撤改善风险调整后收益，而非保证最高年化收益。  \n3. ETF成立前指数代理、固定交易成本、零无风险利率、参数网格多重比较和2026年不完整年度限制外推。  \n4. 后续可加入协方差收缩、权重上限、换手惩罚和滚动交叉验证，并检验不同交易成本。\n\n## 进一步问题\n\n在债券低利率或股债相关性上升阶段，等风险贡献是否仍能保持分散效果？引入权重上限和换手惩罚后，凸性、最优性条件与样本外表现将如何变化？\n\n## 参考文献\n\n[1] Maillard S, Roncalli T, Teïletche J. On the Properties of Equally-Weighted Risk Contributions Portfolios, 2010.  \n[2] Spinu F. An Algorithm for Computing Risk Parity Weights, 2013.  \n[3] Nocedal J, Wright S. Numerical Optimization, 2nd ed., 2006.  \n[4] 华泰研究. 从资产配置走向因子配置：中国版全天候增强策略, 2025.  \n[5] 本项目 v0.01 与 v0.05 风险平价历史代码及本课程复现实验。"
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-07-13T22:00:00+08:00",
+    "status": "ready",
+    "datasets": {
+      "headline_metrics": [
+        {
+          "annual_return": 0.0820305306547584,
+          "sharpe": 1.8945262018641795,
+          "max_drawdown": -0.03408635797199244
+        }
+      ],
+      "nav_monthly": [
+        {
+          "date": "2014-02-28",
+          "strategy": "等权组合",
+          "nav": 1.0024821430269186
+        },
+        {
+          "date": "2014-02-28",
+          "strategy": "逆下行波动率",
+          "nav": 1.0010461564715212
+        },
+        {
+          "date": "2014-02-28",
+          "strategy": "风险平价",
+          "nav": 1.0020321030199761
+        },
+        {
+          "date": "2014-03-31",
+          "strategy": "等权组合",
+          "nav": 0.993161112152377
+        },
+        {
+          "date": "2014-03-31",
+          "strategy": "逆下行波动率",
+          "nav": 0.9943603288587616
+        },
+        {
+          "date": "2014-03-31",
+          "strategy": "风险平价",
+          "nav": 0.9964132548971603
+        },
+        {
+          "date": "2014-04-30",
+          "strategy": "等权组合",
+          "nav": 1.0008468933891586
+        },
+        {
+          "date": "2014-04-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.0084047011931663
+        },
+        {
+          "date": "2014-04-30",
+          "strategy": "风险平价",
+          "nav": 1.0118663151928673
+        },
+        {
+          "date": "2014-05-30",
+          "strategy": "等权组合",
+          "nav": 1.0179996948445897
+        },
+        {
+          "date": "2014-05-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.0300130932786713
+        },
+        {
+          "date": "2014-05-30",
+          "strategy": "风险平价",
+          "nav": 1.0350619791250633
+        },
+        {
+          "date": "2014-06-30",
+          "strategy": "等权组合",
+          "nav": 1.0398277669484273
+        },
+        {
+          "date": "2014-06-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.0460410126634034
+        },
+        {
+          "date": "2014-06-30",
+          "strategy": "风险平价",
+          "nav": 1.0506474321794885
+        },
+        {
+          "date": "2014-07-31",
+          "strategy": "等权组合",
+          "nav": 1.05197649726346
+        },
+        {
+          "date": "2014-07-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.0419511850596657
+        },
+        {
+          "date": "2014-07-31",
+          "strategy": "风险平价",
+          "nav": 1.0424393871553412
+        },
+        {
+          "date": "2014-08-29",
+          "strategy": "等权组合",
+          "nav": 1.0508447368337301
+        },
+        {
+          "date": "2014-08-29",
+          "strategy": "逆下行波动率",
+          "nav": 1.041910511489372
+        },
+        {
+          "date": "2014-08-29",
+          "strategy": "风险平价",
+          "nav": 1.0421250023400417
+        },
+        {
+          "date": "2014-09-30",
+          "strategy": "等权组合",
+          "nav": 1.058696485160492
+        },
+        {
+          "date": "2014-09-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.0545220461804519
+        },
+        {
+          "date": "2014-09-30",
+          "strategy": "风险平价",
+          "nav": 1.0533236126019636
+        },
+        {
+          "date": "2014-10-31",
+          "strategy": "等权组合",
+          "nav": 1.0754882497921752
+        },
+        {
+          "date": "2014-10-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.078209565970577
+        },
+        {
+          "date": "2014-10-31",
+          "strategy": "风险平价",
+          "nav": 1.080550732318929
+        },
+        {
+          "date": "2014-11-28",
+          "strategy": "等权组合",
+          "nav": 1.101896551348598
+        },
+        {
+          "date": "2014-11-28",
+          "strategy": "逆下行波动率",
+          "nav": 1.1097465738627328
+        },
+        {
+          "date": "2014-11-28",
+          "strategy": "风险平价",
+          "nav": 1.1118307085398411
+        },
+        {
+          "date": "2014-12-31",
+          "strategy": "等权组合",
+          "nav": 1.1391177088550155
+        },
+        {
+          "date": "2014-12-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.1390469323726395
+        },
+        {
+          "date": "2014-12-31",
+          "strategy": "风险平价",
+          "nav": 1.131909446990637
+        },
+        {
+          "date": "2015-01-30",
+          "strategy": "等权组合",
+          "nav": 1.1257180264709283
+        },
+        {
+          "date": "2015-01-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.1400616319263095
+        },
+        {
+          "date": "2015-01-30",
+          "strategy": "风险平价",
+          "nav": 1.134577530718085
+        },
+        {
+          "date": "2015-02-27",
+          "strategy": "等权组合",
+          "nav": 1.1757291340280251
+        },
+        {
+          "date": "2015-02-27",
+          "strategy": "逆下行波动率",
+          "nav": 1.1718809199647109
+        },
+        {
+          "date": "2015-02-27",
+          "strategy": "风险平价",
+          "nav": 1.1638797063059618
+        },
+        {
+          "date": "2015-03-31",
+          "strategy": "等权组合",
+          "nav": 1.2197143188758082
+        },
+        {
+          "date": "2015-03-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.1712131957300482
+        },
+        {
+          "date": "2015-03-31",
+          "strategy": "风险平价",
+          "nav": 1.1599574542836593
+        },
+        {
+          "date": "2015-04-30",
+          "strategy": "等权组合",
+          "nav": 1.3143915837321098
+        },
+        {
+          "date": "2015-04-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.231150515736073
+        },
+        {
+          "date": "2015-04-30",
+          "strategy": "风险平价",
+          "nav": 1.2202432026380488
+        },
+        {
+          "date": "2015-05-29",
+          "strategy": "等权组合",
+          "nav": 1.3426292306795764
+        },
+        {
+          "date": "2015-05-29",
+          "strategy": "逆下行波动率",
+          "nav": 1.2276048871180134
+        },
+        {
+          "date": "2015-05-29",
+          "strategy": "风险平价",
+          "nav": 1.219742483580061
+        },
+        {
+          "date": "2015-06-30",
+          "strategy": "等权组合",
+          "nav": 1.2957070956723622
+        },
+        {
+          "date": "2015-06-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.206903480838043
+        },
+        {
+          "date": "2015-06-30",
+          "strategy": "风险平价",
+          "nav": 1.1991736223971043
+        },
+        {
+          "date": "2015-07-31",
+          "strategy": "等权组合",
+          "nav": 1.203186809517861
+        },
+        {
+          "date": "2015-07-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.1796802940783127
+        },
+        {
+          "date": "2015-07-31",
+          "strategy": "风险平价",
+          "nav": 1.1743083127770477
+        },
+        {
+          "date": "2015-08-31",
+          "strategy": "等权组合",
+          "nav": 1.1608991125331838
+        },
+        {
+          "date": "2015-08-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.184366556254147
+        },
+        {
+          "date": "2015-08-31",
+          "strategy": "风险平价",
+          "nav": 1.1813542885196762
+        },
+        {
+          "date": "2015-09-30",
+          "strategy": "等权组合",
+          "nav": 1.1410635986072022
+        },
+        {
+          "date": "2015-09-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.184846952754667
+        },
+        {
+          "date": "2015-09-30",
+          "strategy": "风险平价",
+          "nav": 1.183316135055626
+        },
+        {
+          "date": "2015-10-30",
+          "strategy": "等权组合",
+          "nav": 1.1916957534041657
+        },
+        {
+          "date": "2015-10-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.2039048449686343
+        },
+        {
+          "date": "2015-10-30",
+          "strategy": "风险平价",
+          "nav": 1.2016661785001663
+        },
+        {
+          "date": "2015-11-30",
+          "strategy": "等权组合",
+          "nav": 1.1784441251659208
+        },
+        {
+          "date": "2015-11-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.1879642817238798
+        },
+        {
+          "date": "2015-11-30",
+          "strategy": "风险平价",
+          "nav": 1.1879658574149852
+        },
+        {
+          "date": "2015-12-31",
+          "strategy": "等权组合",
+          "nav": 1.214671557566199
+        },
+        {
+          "date": "2015-12-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.217022109327364
+        },
+        {
+          "date": "2015-12-31",
+          "strategy": "风险平价",
+          "nav": 1.2168049217378831
+        },
+        {
+          "date": "2016-01-29",
+          "strategy": "等权组合",
+          "nav": 1.1301085207352939
+        },
+        {
+          "date": "2016-01-29",
+          "strategy": "逆下行波动率",
+          "nav": 1.2011804554221253
+        },
+        {
+          "date": "2016-01-29",
+          "strategy": "风险平价",
+          "nav": 1.2040966757578078
+        },
+        {
+          "date": "2016-02-29",
+          "strategy": "等权组合",
+          "nav": 1.1330374677181334
+        },
+        {
+          "date": "2016-02-29",
+          "strategy": "逆下行波动率",
+          "nav": 1.2117673635400257
+        },
+        {
+          "date": "2016-02-29",
+          "strategy": "风险平价",
+          "nav": 1.2160199156839626
+        },
+        {
+          "date": "2016-03-31",
+          "strategy": "等权组合",
+          "nav": 1.1990351083016875
+        },
+        {
+          "date": "2016-03-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.2415814356540653
+        },
+        {
+          "date": "2016-03-31",
+          "strategy": "风险平价",
+          "nav": 1.2445473545850418
+        },
+        {
+          "date": "2016-04-29",
+          "strategy": "等权组合",
+          "nav": 1.2263387898463838
+        },
+        {
+          "date": "2016-04-29",
+          "strategy": "逆下行波动率",
+          "nav": 1.2590378889419496
+        },
+        {
+          "date": "2016-04-29",
+          "strategy": "风险平价",
+          "nav": 1.2609467105244319
+        },
+        {
+          "date": "2016-05-31",
+          "strategy": "等权组合",
+          "nav": 1.222393645701032
+        },
+        {
+          "date": "2016-05-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.2533599151698205
+        },
+        {
+          "date": "2016-05-31",
+          "strategy": "风险平价",
+          "nav": 1.2548660354293268
+        },
+        {
+          "date": "2016-06-30",
+          "strategy": "等权组合",
+          "nav": 1.2807616586140589
+        },
+        {
+          "date": "2016-06-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.2836537642342252
+        },
+        {
+          "date": "2016-06-30",
+          "strategy": "风险平价",
+          "nav": 1.2856654807200574
+        },
+        {
+          "date": "2016-07-29",
+          "strategy": "等权组合",
+          "nav": 1.2706541534798306
+        },
+        {
+          "date": "2016-07-29",
+          "strategy": "逆下行波动率",
+          "nav": 1.2906783007760798
+        },
+        {
+          "date": "2016-07-29",
+          "strategy": "风险平价",
+          "nav": 1.2927812924914588
+        },
+        {
+          "date": "2016-08-31",
+          "strategy": "等权组合",
+          "nav": 1.2887331375805522
+        },
+        {
+          "date": "2016-08-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.3021793391295855
+        },
+        {
+          "date": "2016-08-31",
+          "strategy": "风险平价",
+          "nav": 1.3036055718936812
+        },
+        {
+          "date": "2016-09-30",
+          "strategy": "等权组合",
+          "nav": 1.2962322108088347
+        },
+        {
+          "date": "2016-09-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.3131647359830865
+        },
+        {
+          "date": "2016-09-30",
+          "strategy": "风险平价",
+          "nav": 1.3151809789853266
+        },
+        {
+          "date": "2016-10-31",
+          "strategy": "等权组合",
+          "nav": 1.3309669866893816
+        },
+        {
+          "date": "2016-10-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.3352483672448305
+        },
+        {
+          "date": "2016-10-31",
+          "strategy": "风险平价",
+          "nav": 1.3353335939858122
+        },
+        {
+          "date": "2016-11-30",
+          "strategy": "等权组合",
+          "nav": 1.3659026608556974
+        },
+        {
+          "date": "2016-11-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.3462534360696596
+        },
+        {
+          "date": "2016-11-30",
+          "strategy": "风险平价",
+          "nav": 1.3409374273996828
+        },
+        {
+          "date": "2016-12-30",
+          "strategy": "等权组合",
+          "nav": 1.3217194041443068
+        },
+        {
+          "date": "2016-12-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.3057162259626838
+        },
+        {
+          "date": "2016-12-30",
+          "strategy": "风险平价",
+          "nav": 1.2990395761443685
+        },
+        {
+          "date": "2017-01-26",
+          "strategy": "等权组合",
+          "nav": 1.3446912983401775
+        },
+        {
+          "date": "2017-01-26",
+          "strategy": "逆下行波动率",
+          "nav": 1.3152089911162543
+        },
+        {
+          "date": "2017-01-26",
+          "strategy": "风险平价",
+          "nav": 1.3091766053061646
+        },
+        {
+          "date": "2017-02-28",
+          "strategy": "等权组合",
+          "nav": 1.366307362376395
+        },
+        {
+          "date": "2017-02-28",
+          "strategy": "逆下行波动率",
+          "nav": 1.334021790060277
+        },
+        {
+          "date": "2017-02-28",
+          "strategy": "风险平价",
+          "nav": 1.3289255093000067
+        },
+        {
+          "date": "2017-03-31",
+          "strategy": "等权组合",
+          "nav": 1.3567621441161406
+        },
+        {
+          "date": "2017-03-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.330672309033486
+        },
+        {
+          "date": "2017-03-31",
+          "strategy": "风险平价",
+          "nav": 1.3247505109282707
+        },
+        {
+          "date": "2017-04-28",
+          "strategy": "等权组合",
+          "nav": 1.3377510595451025
+        },
+        {
+          "date": "2017-04-28",
+          "strategy": "逆下行波动率",
+          "nav": 1.3185037266939261
+        },
+        {
+          "date": "2017-04-28",
+          "strategy": "风险平价",
+          "nav": 1.3128314779905257
+        },
+        {
+          "date": "2017-05-31",
+          "strategy": "等权组合",
+          "nav": 1.3074936128251824
+        },
+        {
+          "date": "2017-05-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.298561269157566
+        },
+        {
+          "date": "2017-05-31",
+          "strategy": "风险平价",
+          "nav": 1.2912101025774136
+        },
+        {
+          "date": "2017-06-30",
+          "strategy": "等权组合",
+          "nav": 1.3458805852257294
+        },
+        {
+          "date": "2017-06-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.3268539482856652
+        },
+        {
+          "date": "2017-06-30",
+          "strategy": "风险平价",
+          "nav": 1.3186677618810079
+        },
+        {
+          "date": "2017-07-31",
+          "strategy": "等权组合",
+          "nav": 1.376929697710673
+        },
+        {
+          "date": "2017-07-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.3428357284014656
+        },
+        {
+          "date": "2017-07-31",
+          "strategy": "风险平价",
+          "nav": 1.334373966567271
+        },
+        {
+          "date": "2017-08-31",
+          "strategy": "等权组合",
+          "nav": 1.3936682253410306
+        },
+        {
+          "date": "2017-08-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.3494808366163478
+        },
+        {
+          "date": "2017-08-31",
+          "strategy": "风险平价",
+          "nav": 1.3409775348532063
+        },
+        {
+          "date": "2017-09-29",
+          "strategy": "等权组合",
+          "nav": 1.3952573333782856
+        },
+        {
+          "date": "2017-09-29",
+          "strategy": "逆下行波动率",
+          "nav": 1.3484383642619042
+        },
+        {
+          "date": "2017-09-29",
+          "strategy": "风险平价",
+          "nav": 1.3397650339782137
+        },
+        {
+          "date": "2017-10-31",
+          "strategy": "等权组合",
+          "nav": 1.4024231039036361
+        },
+        {
+          "date": "2017-10-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.351995194819834
+        },
+        {
+          "date": "2017-10-31",
+          "strategy": "风险平价",
+          "nav": 1.3409466846898899
+        },
+        {
+          "date": "2017-11-30",
+          "strategy": "等权组合",
+          "nav": 1.4009250948422933
+        },
+        {
+          "date": "2017-11-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.344553045522008
+        },
+        {
+          "date": "2017-11-30",
+          "strategy": "风险平价",
+          "nav": 1.333283525284094
+        },
+        {
+          "date": "2017-12-29",
+          "strategy": "等权组合",
+          "nav": 1.4082101205757258
+        },
+        {
+          "date": "2017-12-29",
+          "strategy": "逆下行波动率",
+          "nav": 1.3476160967468167
+        },
+        {
+          "date": "2017-12-29",
+          "strategy": "风险平价",
+          "nav": 1.335525815562838
+        },
+        {
+          "date": "2018-01-31",
+          "strategy": "等权组合",
+          "nav": 1.431946818168666
+        },
+        {
+          "date": "2018-01-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.3659668184282365
+        },
+        {
+          "date": "2018-01-31",
+          "strategy": "风险平价",
+          "nav": 1.3511312838772243
+        },
+        {
+          "date": "2018-02-28",
+          "strategy": "等权组合",
+          "nav": 1.4186884642220112
+        },
+        {
+          "date": "2018-02-28",
+          "strategy": "逆下行波动率",
+          "nav": 1.368594255402651
+        },
+        {
+          "date": "2018-02-28",
+          "strategy": "风险平价",
+          "nav": 1.3571294218940788
+        },
+        {
+          "date": "2018-03-30",
+          "strategy": "等权组合",
+          "nav": 1.4115023152260613
+        },
+        {
+          "date": "2018-03-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.3781006843446666
+        },
+        {
+          "date": "2018-03-30",
+          "strategy": "风险平价",
+          "nav": 1.370220379590794
+        },
+        {
+          "date": "2018-04-27",
+          "strategy": "等权组合",
+          "nav": 1.4097060301269146
+        },
+        {
+          "date": "2018-04-27",
+          "strategy": "逆下行波动率",
+          "nav": 1.4000114364734473
+        },
+        {
+          "date": "2018-04-27",
+          "strategy": "风险平价",
+          "nav": 1.3942816086102314
+        },
+        {
+          "date": "2018-05-31",
+          "strategy": "等权组合",
+          "nav": 1.4165213763891413
+        },
+        {
+          "date": "2018-05-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.405823088284288
+        },
+        {
+          "date": "2018-05-31",
+          "strategy": "风险平价",
+          "nav": 1.39880701769491
+        },
+        {
+          "date": "2018-06-29",
+          "strategy": "等权组合",
+          "nav": 1.38866497658118
+        },
+        {
+          "date": "2018-06-29",
+          "strategy": "逆下行波动率",
+          "nav": 1.4024108785231229
+        },
+        {
+          "date": "2018-06-29",
+          "strategy": "风险平价",
+          "nav": 1.398608162378948
+        },
+        {
+          "date": "2018-07-31",
+          "strategy": "等权组合",
+          "nav": 1.3816814320373352
+        },
+        {
+          "date": "2018-07-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.4055180659891047
+        },
+        {
+          "date": "2018-07-31",
+          "strategy": "风险平价",
+          "nav": 1.403597832370988
+        },
+        {
+          "date": "2018-08-31",
+          "strategy": "等权组合",
+          "nav": 1.3535204187748175
+        },
+        {
+          "date": "2018-08-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.3883068721884684
+        },
+        {
+          "date": "2018-08-31",
+          "strategy": "风险平价",
+          "nav": 1.3847116671776034
+        },
+        {
+          "date": "2018-09-28",
+          "strategy": "等权组合",
+          "nav": 1.3744227970826122
+        },
+        {
+          "date": "2018-09-28",
+          "strategy": "逆下行波动率",
+          "nav": 1.3966534808481377
+        },
+        {
+          "date": "2018-09-28",
+          "strategy": "风险平价",
+          "nav": 1.3920522312181023
+        },
+        {
+          "date": "2018-10-31",
+          "strategy": "等权组合",
+          "nav": 1.3311698759827577
+        },
+        {
+          "date": "2018-10-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.3879145049657948
+        },
+        {
+          "date": "2018-10-31",
+          "strategy": "风险平价",
+          "nav": 1.3882458761476388
+        },
+        {
+          "date": "2018-11-30",
+          "strategy": "等权组合",
+          "nav": 1.3203623828073974
+        },
+        {
+          "date": "2018-11-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.39049926837925
+        },
+        {
+          "date": "2018-11-30",
+          "strategy": "风险平价",
+          "nav": 1.3921204698033462
+        },
+        {
+          "date": "2018-12-28",
+          "strategy": "等权组合",
+          "nav": 1.308843777288821
+        },
+        {
+          "date": "2018-12-28",
+          "strategy": "逆下行波动率",
+          "nav": 1.4081629533469122
+        },
+        {
+          "date": "2018-12-28",
+          "strategy": "风险平价",
+          "nav": 1.4123303416098825
+        },
+        {
+          "date": "2019-01-31",
+          "strategy": "等权组合",
+          "nav": 1.3373441229012497
+        },
+        {
+          "date": "2019-01-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.4242563123718008
+        },
+        {
+          "date": "2019-01-31",
+          "strategy": "风险平价",
+          "nav": 1.427030803077395
+        },
+        {
+          "date": "2019-02-28",
+          "strategy": "等权组合",
+          "nav": 1.3988867208310574
+        },
+        {
+          "date": "2019-02-28",
+          "strategy": "逆下行波动率",
+          "nav": 1.444173960995762
+        },
+        {
+          "date": "2019-02-28",
+          "strategy": "风险平价",
+          "nav": 1.4425635693696197
+        },
+        {
+          "date": "2019-03-29",
+          "strategy": "等权组合",
+          "nav": 1.4347498004847359
+        },
+        {
+          "date": "2019-03-29",
+          "strategy": "逆下行波动率",
+          "nav": 1.4632952296180344
+        },
+        {
+          "date": "2019-03-29",
+          "strategy": "风险平价",
+          "nav": 1.4588113636295021
+        },
+        {
+          "date": "2019-04-30",
+          "strategy": "等权组合",
+          "nav": 1.418261818503228
+        },
+        {
+          "date": "2019-04-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.4308058251920133
+        },
+        {
+          "date": "2019-04-30",
+          "strategy": "风险平价",
+          "nav": 1.4251683264920632
+        },
+        {
+          "date": "2019-05-31",
+          "strategy": "等权组合",
+          "nav": 1.4066426597430532
+        },
+        {
+          "date": "2019-05-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.434375329575218
+        },
+        {
+          "date": "2019-05-31",
+          "strategy": "风险平价",
+          "nav": 1.4322674306487653
+        },
+        {
+          "date": "2019-06-28",
+          "strategy": "等权组合",
+          "nav": 1.4432722540911784
+        },
+        {
+          "date": "2019-06-28",
+          "strategy": "逆下行波动率",
+          "nav": 1.4644390828577585
+        },
+        {
+          "date": "2019-06-28",
+          "strategy": "风险平价",
+          "nav": 1.4621832308235538
+        },
+        {
+          "date": "2019-07-31",
+          "strategy": "等权组合",
+          "nav": 1.4416149164036673
+        },
+        {
+          "date": "2019-07-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.4698029110730786
+        },
+        {
+          "date": "2019-07-31",
+          "strategy": "风险平价",
+          "nav": 1.467536426850129
+        },
+        {
+          "date": "2019-08-30",
+          "strategy": "等权组合",
+          "nav": 1.4677347166875436
+        },
+        {
+          "date": "2019-08-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.4973613668448613
+        },
+        {
+          "date": "2019-08-30",
+          "strategy": "风险平价",
+          "nav": 1.4956553605401632
+        },
+        {
+          "date": "2019-09-30",
+          "strategy": "等权组合",
+          "nav": 1.466842260088213
+        },
+        {
+          "date": "2019-09-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.489929970452886
+        },
+        {
+          "date": "2019-09-30",
+          "strategy": "风险平价",
+          "nav": 1.4875319291597582
+        },
+        {
+          "date": "2019-10-31",
+          "strategy": "等权组合",
+          "nav": 1.460253053184165
+        },
+        {
+          "date": "2019-10-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.47828127857799
+        },
+        {
+          "date": "2019-10-31",
+          "strategy": "风险平价",
+          "nav": 1.475437721436135
+        },
+        {
+          "date": "2019-11-29",
+          "strategy": "等权组合",
+          "nav": 1.441227907626186
+        },
+        {
+          "date": "2019-11-29",
+          "strategy": "逆下行波动率",
+          "nav": 1.4753584138284017
+        },
+        {
+          "date": "2019-11-29",
+          "strategy": "风险平价",
+          "nav": 1.4706701365855945
+        },
+        {
+          "date": "2019-12-31",
+          "strategy": "等权组合",
+          "nav": 1.494489155128407
+        },
+        {
+          "date": "2019-12-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.5071300594248136
+        },
+        {
+          "date": "2019-12-31",
+          "strategy": "风险平价",
+          "nav": 1.500996607134316
+        },
+        {
+          "date": "2020-01-23",
+          "strategy": "等权组合",
+          "nav": 1.4822267493443275
+        },
+        {
+          "date": "2020-01-23",
+          "strategy": "逆下行波动率",
+          "nav": 1.5104116231075766
+        },
+        {
+          "date": "2020-01-23",
+          "strategy": "风险平价",
+          "nav": 1.504910210338678
+        },
+        {
+          "date": "2020-02-28",
+          "strategy": "等权组合",
+          "nav": 1.4715915701499487
+        },
+        {
+          "date": "2020-02-28",
+          "strategy": "逆下行波动率",
+          "nav": 1.5256845402843342
+        },
+        {
+          "date": "2020-02-28",
+          "strategy": "风险平价",
+          "nav": 1.5236476722678622
+        },
+        {
+          "date": "2020-03-31",
+          "strategy": "等权组合",
+          "nav": 1.420902234711042
+        },
+        {
+          "date": "2020-03-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.532633652132487
+        },
+        {
+          "date": "2020-03-31",
+          "strategy": "风险平价",
+          "nav": 1.5344344952009774
+        },
+        {
+          "date": "2020-04-30",
+          "strategy": "等权组合",
+          "nav": 1.4587751997364407
+        },
+        {
+          "date": "2020-04-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.5482050774324092
+        },
+        {
+          "date": "2020-04-30",
+          "strategy": "风险平价",
+          "nav": 1.547337910631046
+        },
+        {
+          "date": "2020-05-29",
+          "strategy": "等权组合",
+          "nav": 1.4719050735645691
+        },
+        {
+          "date": "2020-05-29",
+          "strategy": "逆下行波动率",
+          "nav": 1.5388130769447779
+        },
+        {
+          "date": "2020-05-29",
+          "strategy": "风险平价",
+          "nav": 1.5361309201513274
+        },
+        {
+          "date": "2020-06-30",
+          "strategy": "等权组合",
+          "nav": 1.5196718755272092
+        },
+        {
+          "date": "2020-06-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.5559013329801392
+        },
+        {
+          "date": "2020-06-30",
+          "strategy": "风险平价",
+          "nav": 1.5468841524919201
+        },
+        {
+          "date": "2020-07-31",
+          "strategy": "等权组合",
+          "nav": 1.6270102249815181
+        },
+        {
+          "date": "2020-07-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.6218067462940333
+        },
+        {
+          "date": "2020-07-31",
+          "strategy": "风险平价",
+          "nav": 1.5999504352173906
+        },
+        {
+          "date": "2020-08-31",
+          "strategy": "等权组合",
+          "nav": 1.653954070638694
+        },
+        {
+          "date": "2020-08-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.632233448572286
+        },
+        {
+          "date": "2020-08-31",
+          "strategy": "风险平价",
+          "nav": 1.6070198426423803
+        },
+        {
+          "date": "2020-09-30",
+          "strategy": "等权组合",
+          "nav": 1.6077791964961154
+        },
+        {
+          "date": "2020-09-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.607685178962661
+        },
+        {
+          "date": "2020-09-30",
+          "strategy": "风险平价",
+          "nav": 1.5871976743341498
+        },
+        {
+          "date": "2020-10-30",
+          "strategy": "等权组合",
+          "nav": 1.6179087893499438
+        },
+        {
+          "date": "2020-10-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.614816031161462
+        },
+        {
+          "date": "2020-10-30",
+          "strategy": "风险平价",
+          "nav": 1.5936800218474663
+        },
+        {
+          "date": "2020-11-30",
+          "strategy": "等权组合",
+          "nav": 1.6816711832588782
+        },
+        {
+          "date": "2020-11-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.6555092954989599
+        },
+        {
+          "date": "2020-11-30",
+          "strategy": "风险平价",
+          "nav": 1.6269263235075289
+        },
+        {
+          "date": "2020-12-31",
+          "strategy": "等权组合",
+          "nav": 1.7204727347591298
+        },
+        {
+          "date": "2020-12-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.687251703623198
+        },
+        {
+          "date": "2020-12-31",
+          "strategy": "风险平价",
+          "nav": 1.6598045295473698
+        },
+        {
+          "date": "2021-01-29",
+          "strategy": "等权组合",
+          "nav": 1.7061495601227685
+        },
+        {
+          "date": "2021-01-29",
+          "strategy": "逆下行波动率",
+          "nav": 1.6835984530313213
+        },
+        {
+          "date": "2021-01-29",
+          "strategy": "风险平价",
+          "nav": 1.657158959770972
+        },
+        {
+          "date": "2021-02-26",
+          "strategy": "等权组合",
+          "nav": 1.7506349911918988
+        },
+        {
+          "date": "2021-02-26",
+          "strategy": "逆下行波动率",
+          "nav": 1.7051048101104846
+        },
+        {
+          "date": "2021-02-26",
+          "strategy": "风险平价",
+          "nav": 1.6746881538789937
+        },
+        {
+          "date": "2021-03-31",
+          "strategy": "等权组合",
+          "nav": 1.732954787916989
+        },
+        {
+          "date": "2021-03-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.71221352846652
+        },
+        {
+          "date": "2021-03-31",
+          "strategy": "风险平价",
+          "nav": 1.6822871165250266
+        },
+        {
+          "date": "2021-04-30",
+          "strategy": "等权组合",
+          "nav": 1.7950175173687757
+        },
+        {
+          "date": "2021-04-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.7409232210676575
+        },
+        {
+          "date": "2021-04-30",
+          "strategy": "风险平价",
+          "nav": 1.7082356513819417
+        },
+        {
+          "date": "2021-05-31",
+          "strategy": "等权组合",
+          "nav": 1.8559236203728084
+        },
+        {
+          "date": "2021-05-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.7781644284338318
+        },
+        {
+          "date": "2021-05-31",
+          "strategy": "风险平价",
+          "nav": 1.7422120208174452
+        },
+        {
+          "date": "2021-06-30",
+          "strategy": "等权组合",
+          "nav": 1.840134977415026
+        },
+        {
+          "date": "2021-06-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.7670025197892336
+        },
+        {
+          "date": "2021-06-30",
+          "strategy": "风险平价",
+          "nav": 1.7321725442268778
+        },
+        {
+          "date": "2021-07-30",
+          "strategy": "等权组合",
+          "nav": 1.8839310637476128
+        },
+        {
+          "date": "2021-07-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.8013125930873444
+        },
+        {
+          "date": "2021-07-30",
+          "strategy": "风险平价",
+          "nav": 1.7666255627724192
+        },
+        {
+          "date": "2021-08-31",
+          "strategy": "等权组合",
+          "nav": 1.9145182359162707
+        },
+        {
+          "date": "2021-08-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.816339008951566
+        },
+        {
+          "date": "2021-08-31",
+          "strategy": "风险平价",
+          "nav": 1.7797098211897078
+        },
+        {
+          "date": "2021-09-30",
+          "strategy": "等权组合",
+          "nav": 1.9677265196967768
+        },
+        {
+          "date": "2021-09-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.8339358216322659
+        },
+        {
+          "date": "2021-09-30",
+          "strategy": "风险平价",
+          "nav": 1.7949600944804578
+        },
+        {
+          "date": "2021-10-29",
+          "strategy": "等权组合",
+          "nav": 1.9189835833839426
+        },
+        {
+          "date": "2021-10-29",
+          "strategy": "逆下行波动率",
+          "nav": 1.812896666894469
+        },
+        {
+          "date": "2021-10-29",
+          "strategy": "风险平价",
+          "nav": 1.7750102727832617
+        },
+        {
+          "date": "2021-11-30",
+          "strategy": "等权组合",
+          "nav": 1.9109558332840277
+        },
+        {
+          "date": "2021-11-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.826579450378351
+        },
+        {
+          "date": "2021-11-30",
+          "strategy": "风险平价",
+          "nav": 1.7884146706355508
+        },
+        {
+          "date": "2021-12-31",
+          "strategy": "等权组合",
+          "nav": 1.9586405218746181
+        },
+        {
+          "date": "2021-12-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.8516742507122481
+        },
+        {
+          "date": "2021-12-31",
+          "strategy": "风险平价",
+          "nav": 1.8122269644714815
+        },
+        {
+          "date": "2022-01-28",
+          "strategy": "等权组合",
+          "nav": 1.9648605388133873
+        },
+        {
+          "date": "2022-01-28",
+          "strategy": "逆下行波动率",
+          "nav": 1.8560849565857584
+        },
+        {
+          "date": "2022-01-28",
+          "strategy": "风险平价",
+          "nav": 1.8175907740806607
+        },
+        {
+          "date": "2022-02-28",
+          "strategy": "等权组合",
+          "nav": 2.032774849343182
+        },
+        {
+          "date": "2022-02-28",
+          "strategy": "逆下行波动率",
+          "nav": 1.880280306348949
+        },
+        {
+          "date": "2022-02-28",
+          "strategy": "风险平价",
+          "nav": 1.8402519981014402
+        },
+        {
+          "date": "2022-03-31",
+          "strategy": "等权组合",
+          "nav": 2.0508909688449624
+        },
+        {
+          "date": "2022-03-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.8894507503921503
+        },
+        {
+          "date": "2022-03-31",
+          "strategy": "风险平价",
+          "nav": 1.8496858758090577
+        },
+        {
+          "date": "2022-04-29",
+          "strategy": "等权组合",
+          "nav": 2.0076144565621754
+        },
+        {
+          "date": "2022-04-29",
+          "strategy": "逆下行波动率",
+          "nav": 1.8845786923119299
+        },
+        {
+          "date": "2022-04-29",
+          "strategy": "风险平价",
+          "nav": 1.8463738811749975
+        },
+        {
+          "date": "2022-05-31",
+          "strategy": "等权组合",
+          "nav": 2.0465228007425087
+        },
+        {
+          "date": "2022-05-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.8998216344686847
+        },
+        {
+          "date": "2022-05-31",
+          "strategy": "风险平价",
+          "nav": 1.8606803616534908
+        },
+        {
+          "date": "2022-06-30",
+          "strategy": "等权组合",
+          "nav": 2.0322075145788423
+        },
+        {
+          "date": "2022-06-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.8902646816278361
+        },
+        {
+          "date": "2022-06-30",
+          "strategy": "风险平价",
+          "nav": 1.851143275899146
+        },
+        {
+          "date": "2022-07-29",
+          "strategy": "等权组合",
+          "nav": 1.996656422470599
+        },
+        {
+          "date": "2022-07-29",
+          "strategy": "逆下行波动率",
+          "nav": 1.8933310205924532
+        },
+        {
+          "date": "2022-07-29",
+          "strategy": "风险平价",
+          "nav": 1.8568301789257284
+        },
+        {
+          "date": "2022-08-31",
+          "strategy": "等权组合",
+          "nav": 2.0048814883853856
+        },
+        {
+          "date": "2022-08-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.9169003017749802
+        },
+        {
+          "date": "2022-08-31",
+          "strategy": "风险平价",
+          "nav": 1.8813564393944342
+        },
+        {
+          "date": "2022-09-30",
+          "strategy": "等权组合",
+          "nav": 1.9877405196992177
+        },
+        {
+          "date": "2022-09-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.9029159731900838
+        },
+        {
+          "date": "2022-09-30",
+          "strategy": "风险平价",
+          "nav": 1.8678205654184452
+        },
+        {
+          "date": "2022-10-31",
+          "strategy": "等权组合",
+          "nav": 1.9468846952055103
+        },
+        {
+          "date": "2022-10-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.900095824412175
+        },
+        {
+          "date": "2022-10-31",
+          "strategy": "风险平价",
+          "nav": 1.8668176092583237
+        },
+        {
+          "date": "2022-11-30",
+          "strategy": "等权组合",
+          "nav": 2.0375171330191084
+        },
+        {
+          "date": "2022-11-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.9088300175764925
+        },
+        {
+          "date": "2022-11-30",
+          "strategy": "风险平价",
+          "nav": 1.8717107494878382
+        },
+        {
+          "date": "2022-12-30",
+          "strategy": "等权组合",
+          "nav": 2.064686824570954
+        },
+        {
+          "date": "2022-12-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.9289976856982105
+        },
+        {
+          "date": "2022-12-30",
+          "strategy": "风险平价",
+          "nav": 1.8913263197800738
+        },
+        {
+          "date": "2023-01-31",
+          "strategy": "等权组合",
+          "nav": 2.122030268532042
+        },
+        {
+          "date": "2023-01-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.9546179389170626
+        },
+        {
+          "date": "2023-01-31",
+          "strategy": "风险平价",
+          "nav": 1.915013596683041
+        },
+        {
+          "date": "2023-02-28",
+          "strategy": "等权组合",
+          "nav": 2.1037552520512772
+        },
+        {
+          "date": "2023-02-28",
+          "strategy": "逆下行波动率",
+          "nav": 1.946611832643709
+        },
+        {
+          "date": "2023-02-28",
+          "strategy": "风险平价",
+          "nav": 1.907250406695209
+        },
+        {
+          "date": "2023-03-31",
+          "strategy": "等权组合",
+          "nav": 2.1144384647286314
+        },
+        {
+          "date": "2023-03-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.9637210787126207
+        },
+        {
+          "date": "2023-03-31",
+          "strategy": "风险平价",
+          "nav": 1.9243166674065735
+        },
+        {
+          "date": "2023-04-28",
+          "strategy": "等权组合",
+          "nav": 2.122298885040237
+        },
+        {
+          "date": "2023-04-28",
+          "strategy": "逆下行波动率",
+          "nav": 1.9815765417915658
+        },
+        {
+          "date": "2023-04-28",
+          "strategy": "风险平价",
+          "nav": 1.9416153686137092
+        },
+        {
+          "date": "2023-05-31",
+          "strategy": "等权组合",
+          "nav": 2.0560171668412623
+        },
+        {
+          "date": "2023-05-31",
+          "strategy": "逆下行波动率",
+          "nav": 1.9727773894471108
+        },
+        {
+          "date": "2023-05-31",
+          "strategy": "风险平价",
+          "nav": 1.9375589652713452
+        },
+        {
+          "date": "2023-06-30",
+          "strategy": "等权组合",
+          "nav": 2.112186376913121
+        },
+        {
+          "date": "2023-06-30",
+          "strategy": "逆下行波动率",
+          "nav": 1.9979813566670213
+        },
+        {
+          "date": "2023-06-30",
+          "strategy": "风险平价",
+          "nav": 1.9620981318892032
+        },
+        {
+          "date": "2023-07-31",
+          "strategy": "等权组合",
+          "nav": 2.201042720775951
+        },
+        {
+          "date": "2023-07-31",
+          "strategy": "逆下行波动率",
+          "nav": 2.0354689340919636
+        },
+        {
+          "date": "2023-07-31",
+          "strategy": "风险平价",
+          "nav": 1.9950175845459606
+        },
+        {
+          "date": "2023-08-31",
+          "strategy": "等权组合",
+          "nav": 2.2145092968339912
+        },
+        {
+          "date": "2023-08-31",
+          "strategy": "逆下行波动率",
+          "nav": 2.052393189124807
+        },
+        {
+          "date": "2023-08-31",
+          "strategy": "风险平价",
+          "nav": 2.015223213350347
+        },
+        {
+          "date": "2023-09-28",
+          "strategy": "等权组合",
+          "nav": 2.1889493695383013
+        },
+        {
+          "date": "2023-09-28",
+          "strategy": "逆下行波动率",
+          "nav": 2.0316198626651762
+        },
+        {
+          "date": "2023-09-28",
+          "strategy": "风险平价",
+          "nav": 1.9946158571334747
+        },
+        {
+          "date": "2023-10-31",
+          "strategy": "等权组合",
+          "nav": 2.165538249898537
+        },
+        {
+          "date": "2023-10-31",
+          "strategy": "逆下行波动率",
+          "nav": 2.0235543779382317
+        },
+        {
+          "date": "2023-10-31",
+          "strategy": "风险平价",
+          "nav": 1.9894759365247288
+        },
+        {
+          "date": "2023-11-30",
+          "strategy": "等权组合",
+          "nav": 2.1620811942826053
+        },
+        {
+          "date": "2023-11-30",
+          "strategy": "逆下行波动率",
+          "nav": 2.025393404290175
+        },
+        {
+          "date": "2023-11-30",
+          "strategy": "风险平价",
+          "nav": 1.9914817046698425
+        },
+        {
+          "date": "2023-12-29",
+          "strategy": "等权组合",
+          "nav": 2.163322480051239
+        },
+        {
+          "date": "2023-12-29",
+          "strategy": "逆下行波动率",
+          "nav": 2.04405813233369
+        },
+        {
+          "date": "2023-12-29",
+          "strategy": "风险平价",
+          "nav": 2.0100593390265122
+        },
+        {
+          "date": "2024-01-31",
+          "strategy": "等权组合",
+          "nav": 2.1051916197468366
+        },
+        {
+          "date": "2024-01-31",
+          "strategy": "逆下行波动率",
+          "nav": 2.0520881017107278
+        },
+        {
+          "date": "2024-01-31",
+          "strategy": "风险平价",
+          "nav": 2.0206710082204062
+        },
+        {
+          "date": "2024-02-29",
+          "strategy": "等权组合",
+          "nav": 2.1741877313365268
+        },
+        {
+          "date": "2024-02-29",
+          "strategy": "逆下行波动率",
+          "nav": 2.0914312664514743
+        },
+        {
+          "date": "2024-02-29",
+          "strategy": "风险平价",
+          "nav": 2.058640988845201
+        },
+        {
+          "date": "2024-03-29",
+          "strategy": "等权组合",
+          "nav": 2.2292623105648506
+        },
+        {
+          "date": "2024-03-29",
+          "strategy": "逆下行波动率",
+          "nav": 2.1224743033987186
+        },
+        {
+          "date": "2024-03-29",
+          "strategy": "风险平价",
+          "nav": 2.0871326381507207
+        },
+        {
+          "date": "2024-04-30",
+          "strategy": "等权组合",
+          "nav": 2.2854210574339646
+        },
+        {
+          "date": "2024-04-30",
+          "strategy": "逆下行波动率",
+          "nav": 2.1654643318599707
+        },
+        {
+          "date": "2024-04-30",
+          "strategy": "风险平价",
+          "nav": 2.126555336036734
+        },
+        {
+          "date": "2024-05-31",
+          "strategy": "等权组合",
+          "nav": 2.3188903566256887
+        },
+        {
+          "date": "2024-05-31",
+          "strategy": "逆下行波动率",
+          "nav": 2.19253580127999
+        },
+        {
+          "date": "2024-05-31",
+          "strategy": "风险平价",
+          "nav": 2.151762061627157
+        },
+        {
+          "date": "2024-06-28",
+          "strategy": "等权组合",
+          "nav": 2.26676378438118
+        },
+        {
+          "date": "2024-06-28",
+          "strategy": "逆下行波动率",
+          "nav": 2.178096817723919
+        },
+        {
+          "date": "2024-06-28",
+          "strategy": "风险平价",
+          "nav": 2.1408406288583524
+        },
+        {
+          "date": "2024-07-31",
+          "strategy": "等权组合",
+          "nav": 2.2273338680981367
+        },
+        {
+          "date": "2024-07-31",
+          "strategy": "逆下行波动率",
+          "nav": 2.168900161636878
+        },
+        {
+          "date": "2024-07-31",
+          "strategy": "风险平价",
+          "nav": 2.135712192266804
+        },
+        {
+          "date": "2024-08-30",
+          "strategy": "等权组合",
+          "nav": 2.1848522740494833
+        },
+        {
+          "date": "2024-08-30",
+          "strategy": "逆下行波动率",
+          "nav": 2.147993788209991
+        },
+        {
+          "date": "2024-08-30",
+          "strategy": "风险平价",
+          "nav": 2.118095415792348
+        },
+        {
+          "date": "2024-09-30",
+          "strategy": "等权组合",
+          "nav": 2.370283541914986
+        },
+        {
+          "date": "2024-09-30",
+          "strategy": "逆下行波动率",
+          "nav": 2.2625386130174245
+        },
+        {
+          "date": "2024-09-30",
+          "strategy": "风险平价",
+          "nav": 2.219513121190146
+        },
+        {
+          "date": "2024-10-31",
+          "strategy": "等权组合",
+          "nav": 2.3398605287145617
+        },
+        {
+          "date": "2024-10-31",
+          "strategy": "逆下行波动率",
+          "nav": 2.244039817634181
+        },
+        {
+          "date": "2024-10-31",
+          "strategy": "风险平价",
+          "nav": 2.2028487278431554
+        },
+        {
+          "date": "2024-11-29",
+          "strategy": "等权组合",
+          "nav": 2.344982181997263
+        },
+        {
+          "date": "2024-11-29",
+          "strategy": "逆下行波动率",
+          "nav": 2.252067651066341
+        },
+        {
+          "date": "2024-11-29",
+          "strategy": "风险平价",
+          "nav": 2.21347847702355
+        },
+        {
+          "date": "2024-12-31",
+          "strategy": "等权组合",
+          "nav": 2.3580039331938667
+        },
+        {
+          "date": "2024-12-31",
+          "strategy": "逆下行波动率",
+          "nav": 2.2914247947507933
+        },
+        {
+          "date": "2024-12-31",
+          "strategy": "风险平价",
+          "nav": 2.255580593035915
+        },
+        {
+          "date": "2025-01-27",
+          "strategy": "等权组合",
+          "nav": 2.370427425644663
+        },
+        {
+          "date": "2025-01-27",
+          "strategy": "逆下行波动率",
+          "nav": 2.3116218250736345
+        },
+        {
+          "date": "2025-01-27",
+          "strategy": "风险平价",
+          "nav": 2.2770010525431017
+        },
+        {
+          "date": "2025-02-28",
+          "strategy": "等权组合",
+          "nav": 2.4090962902130664
+        },
+        {
+          "date": "2025-02-28",
+          "strategy": "逆下行波动率",
+          "nav": 2.3191722852107226
+        },
+        {
+          "date": "2025-02-28",
+          "strategy": "风险平价",
+          "nav": 2.2829524581884035
+        },
+        {
+          "date": "2025-03-31",
+          "strategy": "等权组合",
+          "nav": 2.4203358494775937
+        },
+        {
+          "date": "2025-03-31",
+          "strategy": "逆下行波动率",
+          "nav": 2.3247220184002604
+        },
+        {
+          "date": "2025-03-31",
+          "strategy": "风险平价",
+          "nav": 2.28733060134729
+        },
+        {
+          "date": "2025-04-30",
+          "strategy": "等权组合",
+          "nav": 2.397038748003523
+        },
+        {
+          "date": "2025-04-30",
+          "strategy": "逆下行波动率",
+          "nav": 2.330404675458739
+        },
+        {
+          "date": "2025-04-30",
+          "strategy": "风险平价",
+          "nav": 2.2952052448716964
+        },
+        {
+          "date": "2025-05-30",
+          "strategy": "等权组合",
+          "nav": 2.417170833341262
+        },
+        {
+          "date": "2025-05-30",
+          "strategy": "逆下行波动率",
+          "nav": 2.332721827211917
+        },
+        {
+          "date": "2025-05-30",
+          "strategy": "风险平价",
+          "nav": 2.294175487010489
+        },
+        {
+          "date": "2025-06-30",
+          "strategy": "等权组合",
+          "nav": 2.468078149925696
+        },
+        {
+          "date": "2025-06-30",
+          "strategy": "逆下行波动率",
+          "nav": 2.3595887304115877
+        },
+        {
+          "date": "2025-06-30",
+          "strategy": "风险平价",
+          "nav": 2.316726208971701
+        },
+        {
+          "date": "2025-07-31",
+          "strategy": "等权组合",
+          "nav": 2.4964278279559444
+        },
+        {
+          "date": "2025-07-31",
+          "strategy": "逆下行波动率",
+          "nav": 2.3664135706657126
+        },
+        {
+          "date": "2025-07-31",
+          "strategy": "风险平价",
+          "nav": 2.321773431229887
+        },
+        {
+          "date": "2025-08-29",
+          "strategy": "等权组合",
+          "nav": 2.558834865832065
+        },
+        {
+          "date": "2025-08-29",
+          "strategy": "逆下行波动率",
+          "nav": 2.390120297958097
+        },
+        {
+          "date": "2025-08-29",
+          "strategy": "风险平价",
+          "nav": 2.3414160949707354
+        },
+        {
+          "date": "2025-09-30",
+          "strategy": "等权组合",
+          "nav": 2.5767156477351234
+        },
+        {
+          "date": "2025-09-30",
+          "strategy": "逆下行波动率",
+          "nav": 2.399778062983369
+        },
+        {
+          "date": "2025-09-30",
+          "strategy": "风险平价",
+          "nav": 2.350302602723566
+        },
+        {
+          "date": "2025-10-31",
+          "strategy": "等权组合",
+          "nav": 2.613154264431312
+        },
+        {
+          "date": "2025-10-31",
+          "strategy": "逆下行波动率",
+          "nav": 2.43541033533387
+        },
+        {
+          "date": "2025-10-31",
+          "strategy": "风险平价",
+          "nav": 2.3842207016193595
+        },
+        {
+          "date": "2025-11-28",
+          "strategy": "等权组合",
+          "nav": 2.6189144869957204
+        },
+        {
+          "date": "2025-11-28",
+          "strategy": "逆下行波动率",
+          "nav": 2.4338571062783596
+        },
+        {
+          "date": "2025-11-28",
+          "strategy": "风险平价",
+          "nav": 2.383395430821227
+        },
+        {
+          "date": "2025-12-31",
+          "strategy": "等权组合",
+          "nav": 2.656169785557859
+        },
+        {
+          "date": "2025-12-31",
+          "strategy": "逆下行波动率",
+          "nav": 2.4453224823876774
+        },
+        {
+          "date": "2025-12-31",
+          "strategy": "风险平价",
+          "nav": 2.3910810555399293
+        },
+        {
+          "date": "2026-01-30",
+          "strategy": "等权组合",
+          "nav": 2.780020494616298
+        },
+        {
+          "date": "2026-01-30",
+          "strategy": "逆下行波动率",
+          "nav": 2.5092637080727376
+        },
+        {
+          "date": "2026-01-30",
+          "strategy": "风险平价",
+          "nav": 2.4519221676904754
+        },
+        {
+          "date": "2026-02-27",
+          "strategy": "等权组合",
+          "nav": 2.7931026684270925
+        },
+        {
+          "date": "2026-02-27",
+          "strategy": "逆下行波动率",
+          "nav": 2.5181232279486587
+        },
+        {
+          "date": "2026-02-27",
+          "strategy": "风险平价",
+          "nav": 2.4603921562136097
+        },
+        {
+          "date": "2026-03-31",
+          "strategy": "等权组合",
+          "nav": 2.805283249421803
+        },
+        {
+          "date": "2026-03-31",
+          "strategy": "逆下行波动率",
+          "nav": 2.535768435927076
+        },
+        {
+          "date": "2026-03-31",
+          "strategy": "风险平价",
+          "nav": 2.4741404585661964
+        },
+        {
+          "date": "2026-04-03",
+          "strategy": "等权组合",
+          "nav": 2.8036859498397564
+        },
+        {
+          "date": "2026-04-03",
+          "strategy": "逆下行波动率",
+          "nav": 2.531685782713538
+        },
+        {
+          "date": "2026-04-03",
+          "strategy": "风险平价",
+          "nav": 2.4702966110692888
+        }
+      ],
+      "performance": [
+        {
+          "strategy": "等权组合",
+          "period": "训练期",
+          "annual_return": 0.0844795789444659,
+          "annual_volatility": 0.0991069843125095,
+          "sharpe": 0.8680910903651397,
+          "max_drawdown": -0.1937489791614856,
+          "calmar": 0.43602593061434397,
+          "annual_turnover": 0.5617873186557557
+        },
+        {
+          "strategy": "逆下行波动率",
+          "period": "训练期",
+          "annual_return": 0.08132367291798626,
+          "annual_volatility": 0.04736386830041384,
+          "sharpe": 1.6746722558474376,
+          "max_drawdown": -0.05817828963681926,
+          "calmar": 1.3978354026158752,
+          "annual_turnover": 1.7723095766322399
+        },
+        {
+          "strategy": "风险平价",
+          "period": "训练期",
+          "annual_return": 0.07867614328210948,
+          "annual_volatility": 0.04446326480934408,
+          "sharpe": 1.725777459789838,
+          "max_drawdown": -0.055789114100816994,
+          "calmar": 1.410241846463687,
+          "annual_turnover": 2.0272377025899155
+        },
+        {
+          "strategy": "等权组合",
+          "period": "验证期",
+          "annual_return": 0.10166415205602508,
+          "annual_volatility": 0.0912035691776167,
+          "sharpe": 1.1074565400462615,
+          "max_drawdown": -0.0956202250332765,
+          "calmar": 1.0632076218252493,
+          "annual_turnover": 0.3955301512537249
+        },
+        {
+          "strategy": "逆下行波动率",
+          "period": "验证期",
+          "annual_return": 0.08377953376734726,
+          "annual_volatility": 0.044868209292150324,
+          "sharpe": 1.8158685369332825,
+          "max_drawdown": -0.04203918480186564,
+          "calmar": 1.9928914930726547,
+          "annual_turnover": 1.5845958629321815
+        },
+        {
+          "strategy": "风险平价",
+          "period": "验证期",
+          "annual_return": 0.0820305306547584,
+          "annual_volatility": 0.04208877907076626,
+          "sharpe": 1.8945262018641795,
+          "max_drawdown": -0.03408635797199244,
+          "calmar": 2.406550172422645,
+          "annual_turnover": 1.7015725149260064
+        }
+      ],
+      "algorithm_summary": [
+        {
+          "method": "lbfgsb",
+          "observations": 148,
+          "success_rate": 1.0,
+          "median_iterations": 29.0,
+          "median_runtime_ms": 3.420299995923415,
+          "p95_runtime_ms": 6.293034987174908,
+          "median_rc_error": 1.4740418260994481e-09,
+          "max_rc_error": 1.2611040101084825e-08,
+          "max_weight_sum_error": 2.220446049250313e-16,
+          "algorithm": "L-BFGS-B"
+        },
+        {
+          "method": "newton",
+          "observations": 148,
+          "success_rate": 0.9797297297297297,
+          "median_iterations": 8.0,
+          "median_runtime_ms": 0.30384998535737395,
+          "p95_runtime_ms": 0.45014501374680554,
+          "median_rc_error": 1.0943815298425363e-12,
+          "max_rc_error": 2.1389505444613377e-09,
+          "max_weight_sum_error": 2.220446049250313e-16,
+          "algorithm": "阻尼牛顿法"
+        },
+        {
+          "method": "slsqp",
+          "observations": 148,
+          "success_rate": 0.9527027027027027,
+          "median_iterations": 42.5,
+          "median_runtime_ms": 6.700350000755861,
+          "p95_runtime_ms": 9.11607002199162,
+          "median_rc_error": 2.98549907747081e-07,
+          "max_rc_error": 2.4676776982507365e-06,
+          "max_weight_sum_error": 2.220446049250313e-16,
+          "algorithm": "SLSQP"
+        }
+      ],
+      "sensitivity_validation": [
+        {
+          "decay": 0.9,
+          "window": 126,
+          "period": "validation",
+          "observations": 1271,
+          "cumulative_return": 0.5403183707915162,
+          "annual_return": 0.08942505762716335,
+          "annual_volatility": 0.046387472055041803,
+          "sharpe": 1.8699611385490915,
+          "max_drawdown": -0.03483772225029491,
+          "calmar": 2.566903111078289,
+          "monthly_win_rate": 0.734375,
+          "annual_turnover": 4.2589184322710265,
+          "average_max_weight": 0.44304971151741007,
+          "average_rc_error": 1.1579297503477859e-10,
+          "window_label": "126",
+          "decay_label": "0.90"
+        },
+        {
+          "decay": 0.9,
+          "window": 252,
+          "period": "validation",
+          "observations": 1271,
+          "cumulative_return": 0.5403180970718491,
+          "annual_return": 0.08942501924337032,
+          "annual_volatility": 0.046387441034569786,
+          "sharpe": 1.8699615980697033,
+          "max_drawdown": -0.03483768309149082,
+          "calmar": 2.5669048945798743,
+          "monthly_win_rate": 0.734375,
+          "annual_turnover": 4.2589055855892815,
+          "average_max_weight": 0.4430496660635022,
+          "average_rc_error": 9.652296366693958e-11,
+          "window_label": "252",
+          "decay_label": "0.90"
+        },
+        {
+          "decay": 0.9,
+          "window": 504,
+          "period": "validation",
+          "observations": 1271,
+          "cumulative_return": 0.5403180970679371,
+          "annual_return": 0.08942501924282165,
+          "annual_volatility": 0.04638744103606208,
+          "sharpe": 1.8699615980001874,
+          "max_drawdown": -0.034837683091413885,
+          "calmar": 2.566904894569794,
+          "monthly_win_rate": 0.734375,
+          "annual_turnover": 4.2589055862983365,
+          "average_max_weight": 0.44304966604431584,
+          "average_rc_error": 1.2691499977693366e-10,
+          "window_label": "504",
+          "decay_label": "0.90"
+        },
+        {
+          "decay": 0.94,
+          "window": 126,
+          "period": "validation",
+          "observations": 1271,
+          "cumulative_return": 0.5197941759395515,
+          "annual_return": 0.08653144636644683,
+          "annual_volatility": 0.044358786458963316,
+          "sharpe": 1.8934154504521499,
+          "max_drawdown": -0.03240887908268553,
+          "calmar": 2.669991953306288,
+          "monthly_win_rate": 0.734375,
+          "annual_turnover": 2.953493667781857,
+          "average_max_weight": 0.442601723862116,
+          "average_rc_error": 1.0953008161909694e-10,
+          "window_label": "126",
+          "decay_label": "0.94"
+        },
+        {
+          "decay": 0.94,
+          "window": 252,
+          "period": "validation",
+          "observations": 1271,
+          "cumulative_return": 0.5197586325682775,
+          "annual_return": 0.08652640816876045,
+          "annual_volatility": 0.044354093984783204,
+          "sharpe": 1.893506466606605,
+          "max_drawdown": -0.03240140687822002,
+          "calmar": 2.670452196534801,
+          "monthly_win_rate": 0.734375,
+          "annual_turnover": 2.9517827485118175,
+          "average_max_weight": 0.4425944260689436,
+          "average_rc_error": 9.092968023503845e-11,
+          "window_label": "252",
+          "decay_label": "0.94"
+        },
+        {
+          "decay": 0.94,
+          "window": 504,
+          "period": "validation",
+          "observations": 1271,
+          "cumulative_return": 0.519758607413418,
+          "annual_return": 0.08652640460307892,
+          "annual_volatility": 0.044354092925157705,
+          "sharpe": 1.8935064367650258,
+          "max_drawdown": -0.032401402815242064,
+          "calmar": 2.6704524213493532,
+          "monthly_win_rate": 0.734375,
+          "annual_turnover": 2.95178162783146,
+          "average_max_weight": 0.44259441362998847,
+          "average_rc_error": 8.28358265227841e-11,
+          "window_label": "504",
+          "decay_label": "0.94"
+        },
+        {
+          "decay": 0.97,
+          "window": 126,
+          "period": "validation",
+          "observations": 1271,
+          "cumulative_return": 0.48855146425821894,
+          "annual_return": 0.08206594824536717,
+          "annual_volatility": 0.042242133434385466,
+          "sharpe": 1.8885773175954201,
+          "max_drawdown": -0.03444904648575975,
+          "calmar": 2.382241502077304,
+          "monthly_win_rate": 0.71875,
+          "annual_turnover": 1.7495842132693484,
+          "average_max_weight": 0.4429621956465642,
+          "average_rc_error": 1.0825567113743884e-10,
+          "window_label": "126",
+          "decay_label": "0.97"
+        },
+        {
+          "decay": 0.97,
+          "window": 252,
+          "period": "validation",
+          "observations": 1271,
+          "cumulative_return": 0.4883057414856826,
+          "annual_return": 0.0820305306547584,
+          "annual_volatility": 0.04208877907076626,
+          "sharpe": 1.8945262018641795,
+          "max_drawdown": -0.03408635797199244,
+          "calmar": 2.406550172422645,
+          "monthly_win_rate": 0.71875,
+          "annual_turnover": 1.7015725149260064,
+          "average_max_weight": 0.4428283510370935,
+          "average_rc_error": 9.443392812516493e-11,
+          "window_label": "252",
+          "decay_label": "0.97"
+        },
+        {
+          "decay": 0.97,
+          "window": 504,
+          "period": "validation",
+          "observations": 1271,
+          "cumulative_return": 0.4882996981790393,
+          "annual_return": 0.0820296595353569,
+          "annual_volatility": 0.042087131699577146,
+          "sharpe": 1.8945795718822993,
+          "max_drawdown": -0.034075476786182834,
+          "calmar": 2.407293082062431,
+          "monthly_win_rate": 0.71875,
+          "annual_turnover": 1.700300884015081,
+          "average_max_weight": 0.4428089013257568,
+          "average_rc_error": 6.914234072438741e-11,
+          "window_label": "504",
+          "decay_label": "0.97"
+        },
+        {
+          "decay": 0.99,
+          "window": 126,
+          "period": "validation",
+          "observations": 1271,
+          "cumulative_return": 0.4754529690787552,
+          "annual_return": 0.08017140890283203,
+          "annual_volatility": 0.04088906590258431,
+          "sharpe": 1.9068100361032814,
+          "max_drawdown": -0.03488986599927968,
+          "calmar": 2.2978422704313974,
+          "monthly_win_rate": 0.734375,
+          "annual_turnover": 0.998147040886843,
+          "average_max_weight": 0.44260283884297685,
+          "average_rc_error": 5.7992252059518856e-11,
+          "window_label": "126",
+          "decay_label": "0.99"
+        },
+        {
+          "decay": 0.99,
+          "window": 252,
+          "period": "validation",
+          "observations": 1271,
+          "cumulative_return": 0.4759582707506518,
+          "annual_return": 0.08024474426117112,
+          "annual_volatility": 0.039973605464844825,
+          "sharpe": 1.9512507037104156,
+          "max_drawdown": -0.03128974225160652,
+          "calmar": 2.5645703187935682,
+          "monthly_win_rate": 0.75,
+          "annual_turnover": 0.7085694030864168,
+          "average_max_weight": 0.4412683167898323,
+          "average_rc_error": 6.886099221219133e-11,
+          "window_label": "252",
+          "decay_label": "0.99"
+        },
+        {
+          "decay": 0.99,
+          "window": 504,
+          "period": "validation",
+          "observations": 1271,
+          "cumulative_return": 0.47895460699601156,
+          "annual_return": 0.08067919494087583,
+          "annual_volatility": 0.03991008228625331,
+          "sharpe": 1.9643712245867826,
+          "max_drawdown": -0.029794448327406742,
+          "calmar": 2.7078600031221995,
+          "monthly_win_rate": 0.75,
+          "annual_turnover": 0.64394403864731,
+          "average_max_weight": 0.4396215420427283,
+          "average_rc_error": 1.2073536766708803e-10,
+          "window_label": "504",
+          "decay_label": "0.99"
+        }
+      ],
+      "optimal_solution": [
+        {
+          "asset": "10年国债ETF",
+          "measure": "组合权重",
+          "value": 0.4495962329880602
+        },
+        {
+          "asset": "10年国债ETF",
+          "measure": "风险贡献",
+          "value": 0.11111111111042182
+        },
+        {
+          "asset": "30年国债ETF",
+          "measure": "组合权重",
+          "value": 0.10392823809203072
+        },
+        {
+          "asset": "30年国债ETF",
+          "measure": "风险贡献",
+          "value": 0.11111111111117897
+        },
+        {
+          "asset": "中证1000ETF",
+          "measure": "组合权重",
+          "value": 0.04553977806522725
+        },
+        {
+          "asset": "中证1000ETF",
+          "measure": "风险贡献",
+          "value": 0.11111111111120059
+        },
+        {
+          "asset": "有色ETF",
+          "measure": "组合权重",
+          "value": 0.0668614322423256
+        },
+        {
+          "asset": "有色ETF",
+          "measure": "风险贡献",
+          "value": 0.11111111111120048
+        },
+        {
+          "asset": "沪深300ETF",
+          "measure": "组合权重",
+          "value": 0.05635702963816033
+        },
+        {
+          "asset": "沪深300ETF",
+          "measure": "风险贡献",
+          "value": 0.1111111111112005
+        },
+        {
+          "asset": "红利低波ETF",
+          "measure": "组合权重",
+          "value": 0.08961641172994476
+        },
+        {
+          "asset": "红利低波ETF",
+          "measure": "风险贡献",
+          "value": 0.11111111111119984
+        },
+        {
+          "asset": "能源化工ETF",
+          "measure": "组合权重",
+          "value": 0.057169980200426435
+        },
+        {
+          "asset": "能源化工ETF",
+          "measure": "风险贡献",
+          "value": 0.11111111111119835
+        },
+        {
+          "asset": "豆粕ETF",
+          "measure": "组合权重",
+          "value": 0.08171074489614523
+        },
+        {
+          "asset": "豆粕ETF",
+          "measure": "风险贡献",
+          "value": 0.11111111111119999
+        },
+        {
+          "asset": "黄金ETF",
+          "measure": "组合权重",
+          "value": 0.04922015214767955
+        },
+        {
+          "asset": "黄金ETF",
+          "measure": "风险贡献",
+          "value": 0.11111111111119934
+        }
+      ],
+      "estimator_validation": [
+        {
+          "estimator": "ewma_full",
+          "period": "validation",
+          "observations": 1271,
+          "cumulative_return": 0.49820187279395567,
+          "annual_return": 0.08345323045786301,
+          "annual_volatility": 0.03693408387837489,
+          "sharpe": 2.1889835943292684,
+          "max_drawdown": -0.028275884154097763,
+          "calmar": 2.951392430491653,
+          "monthly_win_rate": 0.765625,
+          "annual_turnover": 1.6274956486568106,
+          "average_max_weight": 0.4707701681959251,
+          "average_rc_error": 1.269764653664962e-10,
+          "estimator_name": "EWMA全协方差"
+        },
+        {
+          "estimator": "ewma_semi",
+          "period": "validation",
+          "observations": 1271,
+          "cumulative_return": 0.4883057414856826,
+          "annual_return": 0.0820305306547584,
+          "annual_volatility": 0.04208877907076626,
+          "sharpe": 1.8945262018641795,
+          "max_drawdown": -0.03408635797199244,
+          "calmar": 2.406550172422645,
+          "monthly_win_rate": 0.71875,
+          "annual_turnover": 1.7015725149260064,
+          "average_max_weight": 0.4428283510370935,
+          "average_rc_error": 9.443392812516493e-11,
+          "estimator_name": "EWMA半协方差"
+        },
+        {
+          "estimator": "sample",
+          "period": "validation",
+          "observations": 1271,
+          "cumulative_return": 0.4767576485865572,
+          "annual_return": 0.08036071833347602,
+          "annual_volatility": 0.03605938742404103,
+          "sharpe": 2.1618960585064104,
+          "max_drawdown": -0.022409787864872688,
+          "calmar": 3.585965151390002,
+          "monthly_win_rate": 0.71875,
+          "annual_turnover": 0.5020649832031562,
+          "average_max_weight": 0.46850362309057136,
+          "average_rc_error": 7.018727200998331e-11,
+          "estimator_name": "样本协方差"
+        }
+      ],
+      "stress_view": [
+        {
+          "condition_number": 100000000.0,
+          "method": "lbfgsb",
+          "success_rate": 0.45,
+          "median_iterations": 116.0,
+          "median_runtime_ms": 15.429199993377551,
+          "median_rc_error": 4.461635659674945e-06,
+          "max_rc_error": 0.0002468136759312123,
+          "algorithm": "L-BFGS-B"
+        },
+        {
+          "condition_number": 100000000.0,
+          "method": "newton",
+          "success_rate": 0.95,
+          "median_iterations": 13.0,
+          "median_runtime_ms": 0.4850999976042658,
+          "median_rc_error": 5.82822470840405e-11,
+          "max_rc_error": 2.9458570643958737e-07,
+          "algorithm": "阻尼牛顿法"
+        },
+        {
+          "condition_number": 100000000.0,
+          "method": "slsqp",
+          "success_rate": 0.05,
+          "median_iterations": 48.0,
+          "median_runtime_ms": 7.967799989273772,
+          "median_rc_error": 0.11811472265562617,
+          "max_rc_error": 2.0735189203200264,
+          "algorithm": "SLSQP"
+        }
+      ],
+      "data_quality": [
+        {
+          "check": "数据行数",
+          "value": 3216.0,
+          "result": "通过"
+        },
+        {
+          "check": "资产数量",
+          "value": 9.0,
+          "result": "通过"
+        },
+        {
+          "check": "重复日期",
+          "value": 0.0,
+          "result": "通过"
+        },
+        {
+          "check": "清洗前缺失单元格",
+          "value": 3.0,
+          "result": "已按0收益处理"
+        },
+        {
+          "check": "清洗后缺失单元格",
+          "value": 0.0,
+          "result": "通过"
+        }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "etf_data",
+      "label": "ETF风险平价回测数据",
+      "path": "data/etf_returns.csv",
+      "description": "项目原始 Excel 第一张工作表清洗后的 9 资产日收益。"
+    },
+    {
+      "id": "derived_results",
+      "label": "课程实验派生结果",
+      "path": "output/tables/analysis_summary.json",
+      "description": "阻尼牛顿法、算法比较、回测、稳健性和敏感性实验的可复现输出。"
+    },
+    {
+      "id": "research_report",
+      "label": "华泰研究：中国版全天候增强策略",
+      "path": "策略研报来源/金工_ 从资产配置走向因子配置：中国版全天候增强策略.pdf",
+      "description": "用于风险平价与宏观因子配置的研究背景，不复制其中图表。"
+    },
+    {
+      "id": "headline_query",
+      "label": "从策略绩效表抽取风险平价验证期核心指标。",
+      "path": "output/html/report_queries.sql",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "sql": "SELECT annual_return, sharpe, max_drawdown\nFROM read_csv_auto('output/tables/strategy_metrics.csv', header=true)\nWHERE strategy='erc' AND period='validation'",
+        "description": "从策略绩效表抽取风险平价验证期核心指标。",
+        "tables_used": [
+          "output/tables/*.csv",
+          "data/etf_returns.csv"
+        ],
+        "executed_at": "2026-07-13T22:00:00+08:00"
+      }
+    },
+    {
+      "id": "nav_query",
+      "label": "将日净值转换为月末长表，供累计净值图使用。",
+      "path": "output/html/report_queries.sql",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "sql": "WITH long_data AS (\n  UNPIVOT (SELECT * FROM read_csv_auto('output/tables/strategy_nav.csv', header=true))\n  ON equal_weight, inverse_downside_vol, erc\n  INTO NAME strategy VALUE nav\n), ranked AS (\n  SELECT CAST(date AS DATE) AS date, strategy, nav,\n         row_number() OVER (\n           PARTITION BY date_trunc('month', CAST(date AS DATE)), strategy\n           ORDER BY CAST(date AS DATE) DESC\n         ) AS rn\n  FROM long_data\n)\nSELECT strftime(date, '%Y-%m-%d') AS date,\n       CASE strategy\n         WHEN 'equal_weight' THEN '等权组合'\n         WHEN 'inverse_downside_vol' THEN '逆下行波动率'\n         ELSE '风险平价'\n       END AS strategy,\n       nav\nFROM ranked WHERE rn=1 ORDER BY date, strategy",
+        "description": "将日净值转换为月末长表，供累计净值图使用。",
+        "tables_used": [
+          "output/tables/*.csv",
+          "data/etf_returns.csv"
+        ],
+        "executed_at": "2026-07-13T22:00:00+08:00"
+      }
+    },
+    {
+      "id": "performance_query",
+      "label": "抽取训练期和验证期的三策略绩效。",
+      "path": "output/html/report_queries.sql",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "sql": "SELECT CASE strategy\n         WHEN 'equal_weight' THEN '等权组合'\n         WHEN 'inverse_downside_vol' THEN '逆下行波动率'\n         ELSE '风险平价'\n       END AS strategy,\n       CASE period WHEN 'train' THEN '训练期' ELSE '验证期' END AS period,\n       annual_return, annual_volatility, sharpe, max_drawdown, calmar, annual_turnover\nFROM read_csv_auto('output/tables/strategy_metrics.csv', header=true)\nWHERE period IN ('train', 'validation')\nORDER BY period, strategy",
+        "description": "抽取训练期和验证期的三策略绩效。",
+        "tables_used": [
+          "output/tables/*.csv",
+          "data/etf_returns.csv"
+        ],
+        "executed_at": "2026-07-13T22:00:00+08:00"
+      }
+    },
+    {
+      "id": "algorithm_query",
+      "label": "抽取滚动窗口求解器效率与精度摘要。",
+      "path": "output/html/report_queries.sql",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "sql": "SELECT *, CASE method\n         WHEN 'newton' THEN '阻尼牛顿法'\n         WHEN 'lbfgsb' THEN 'L-BFGS-B'\n         ELSE 'SLSQP'\n       END AS algorithm\nFROM read_csv_auto('output/tables/algorithm_summary.csv', header=true)\nORDER BY method",
+        "description": "抽取滚动窗口求解器效率与精度摘要。",
+        "tables_used": [
+          "output/tables/*.csv",
+          "data/etf_returns.csv"
+        ],
+        "executed_at": "2026-07-13T22:00:00+08:00"
+      }
+    },
+    {
+      "id": "sensitivity_query",
+      "label": "抽取12组参数的样本外敏感性结果。",
+      "path": "output/html/report_queries.sql",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "sql": "SELECT *, CAST(CAST(\"window\" AS INTEGER) AS VARCHAR) AS window_label,\n       printf('%.2f', decay) AS decay_label\nFROM read_csv_auto('output/tables/parameter_sensitivity.csv', header=true)\nWHERE period='validation'\nORDER BY decay, \"window\"",
+        "description": "抽取12组参数的样本外敏感性结果。",
+        "tables_used": [
+          "output/tables/*.csv",
+          "data/etf_returns.csv"
+        ],
+        "executed_at": "2026-07-13T22:00:00+08:00"
+      }
+    },
+    {
+      "id": "optimal_query",
+      "label": "将代表窗口权重和风险贡献转换为长表。",
+      "path": "output/html/report_queries.sql",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "sql": "SELECT asset,\n       CASE measure WHEN 'weight' THEN '组合权重' ELSE '风险贡献' END AS measure,\n       value\nFROM (\n  UNPIVOT (\n    SELECT asset, weight, risk_contribution\n    FROM read_csv_auto('output/tables/representative_optimal_solution.csv', header=true)\n  ) ON weight, risk_contribution INTO NAME measure VALUE value\n)\nORDER BY asset, measure",
+        "description": "将代表窗口权重和风险贡献转换为长表。",
+        "tables_used": [
+          "output/tables/*.csv",
+          "data/etf_returns.csv"
+        ],
+        "executed_at": "2026-07-13T22:00:00+08:00"
+      }
+    },
+    {
+      "id": "estimator_query",
+      "label": "抽取三类风险估计方法的样本外表现。",
+      "path": "output/html/report_queries.sql",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "sql": "SELECT *, CASE estimator\n         WHEN 'sample' THEN '样本协方差'\n         WHEN 'ewma_full' THEN 'EWMA全协方差'\n         ELSE 'EWMA半协方差'\n       END AS estimator_name\nFROM read_csv_auto('output/tables/estimator_comparison.csv', header=true)\nWHERE period='validation'\nORDER BY estimator",
+        "description": "抽取三类风险估计方法的样本外表现。",
+        "tables_used": [
+          "output/tables/*.csv",
+          "data/etf_returns.csv"
+        ],
+        "executed_at": "2026-07-13T22:00:00+08:00"
+      }
+    },
+    {
+      "id": "stress_query",
+      "label": "抽取条件数1e8时的病态矩阵压力测试结果。",
+      "path": "output/html/report_queries.sql",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "sql": "SELECT *, CASE method\n         WHEN 'newton' THEN '阻尼牛顿法'\n         WHEN 'lbfgsb' THEN 'L-BFGS-B'\n         ELSE 'SLSQP'\n       END AS algorithm\nFROM read_csv_auto('output/tables/stress_test_summary.csv', header=true)\nWHERE condition_number=(\n  SELECT max(condition_number)\n  FROM read_csv_auto('output/tables/stress_test_summary.csv', header=true)\n)\nORDER BY method",
+        "description": "抽取条件数1e8时的病态矩阵压力测试结果。",
+        "tables_used": [
+          "output/tables/*.csv",
+          "data/etf_returns.csv"
+        ],
+        "executed_at": "2026-07-13T22:00:00+08:00"
+      }
+    },
+    {
+      "id": "quality_query",
+      "label": "从清洗收益和质量概要复算行数、资产数、重复与缺失。",
+      "path": "output/html/report_queries.sql",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "sql": "WITH clean AS (\n  SELECT * FROM read_csv_auto('data/etf_returns.csv', header=true)\n), long_clean AS (\n  UNPIVOT clean ON COLUMNS(* EXCLUDE (date)) INTO NAME asset VALUE daily_return\n), profile AS (\n  SELECT * FROM read_csv_auto('output/tables/data_quality_profile.csv', header=true)\n)\nSELECT '数据行数' AS check, (SELECT count(*) FROM clean) AS value, '通过' AS result\nUNION ALL SELECT '资产数量', (SELECT count(DISTINCT asset) FROM long_clean), '通过'\nUNION ALL SELECT '重复日期', (SELECT count(*)-count(DISTINCT date) FROM clean), '通过'\nUNION ALL SELECT '清洗前缺失单元格', (SELECT sum(missing_before_fill) FROM profile), '已按0收益处理'\nUNION ALL SELECT '清洗后缺失单元格', (SELECT count(*) FROM long_clean WHERE daily_return IS NULL), '通过'",
+        "description": "从清洗收益和质量概要复算行数、资产数、重复与缺失。",
+        "tables_used": [
+          "output/tables/*.csv",
+          "data/etf_returns.csv"
+        ],
+        "executed_at": "2026-07-13T22:00:00+08:00"
+      }
+    }
+  ]
+}
