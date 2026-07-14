@@ -3,16 +3,16 @@
     "strategy": "erc",
     "period": "validation",
     "observations": 1271,
-    "cumulative_return": 0.4883057414856826,
-    "annual_return": 0.0820305306547584,
-    "annual_volatility": 0.04208877907076626,
-    "sharpe": 1.8945262018641795,
-    "max_drawdown": -0.03408635797199244,
-    "calmar": 2.406550172422645,
+    "cumulative_return": 0.48830574151056005,
+    "annual_return": 0.08203053065834442,
+    "annual_volatility": 0.042088779068702266,
+    "sharpe": 1.8945262020338047,
+    "max_drawdown": -0.034086357971992554,
+    "calmar": 2.406550172527841,
     "monthly_win_rate": 0.71875,
-    "annual_turnover": 1.7015725149260064,
-    "average_max_weight": 0.4428283510370935,
-    "average_rc_error": 9.443392812516493e-11
+    "annual_turnover": 1.701572514730177,
+    "average_max_weight": 0.4428283510421501,
+    "average_rc_error": 9.161733264401173e-11
   },
   "validation_equal_weight": {
     "strategy": "equal_weight",
@@ -32,23 +32,23 @@
   "newton_summary": {
     "method": "newton",
     "observations": 148,
-    "success_rate": 0.9797297297297297,
+    "success_rate": 0.9932432432432432,
     "median_iterations": 8.0,
-    "median_runtime_ms": 0.30384998535737395,
-    "p95_runtime_ms": 0.45014501374680554,
-    "median_rc_error": 1.0943815298425363e-12,
-    "max_rc_error": 2.1389505444613377e-09,
-    "max_weight_sum_error": 2.220446049250313e-16
+    "median_runtime_ms": 0.5707500386051834,
+    "p95_runtime_ms": 1.4318300061859193,
+    "median_rc_error": 6.949579800519246e-13,
+    "max_rc_error": 1.612649194737692e-09,
+    "max_weight_sum_error": 3.3306690738754696e-16
   },
   "lbfgsb_summary": {
     "method": "lbfgsb",
     "observations": 148,
     "success_rate": 1.0,
     "median_iterations": 29.0,
-    "median_runtime_ms": 3.420299995923415,
-    "p95_runtime_ms": 6.293034987174908,
-    "median_rc_error": 1.4740418260994481e-09,
-    "max_rc_error": 1.2611040101084825e-08,
+    "median_runtime_ms": 5.417399981524795,
+    "p95_runtime_ms": 10.60980494366959,
+    "median_rc_error": 1.5064602690295636e-09,
+    "max_rc_error": 6.949204947592769e-09,
     "max_weight_sum_error": 2.220446049250313e-16
   },
   "slsqp_summary": {
@@ -56,39 +56,86 @@
     "observations": 148,
     "success_rate": 0.9527027027027027,
     "median_iterations": 42.5,
-    "median_runtime_ms": 6.700350000755861,
-    "p95_runtime_ms": 9.11607002199162,
-    "median_rc_error": 2.98549907747081e-07,
-    "max_rc_error": 2.4676776982507365e-06,
+    "median_runtime_ms": 12.755600037053227,
+    "p95_runtime_ms": 20.55281496723183,
+    "median_rc_error": 2.985499077332032e-07,
+    "max_rc_error": 2.4676776982368587e-06,
     "max_weight_sum_error": 2.220446049250313e-16
   },
   "stress_newton_1e8": {
     "condition_number": 100000000.0,
     "method": "newton",
     "success_rate": 0.95,
-    "median_iterations": 13.0,
-    "median_runtime_ms": 0.4850999976042658,
-    "median_rc_error": 5.82822470840405e-11,
-    "max_rc_error": 2.9458570643958737e-07
+    "median_iterations": 13.5,
+    "median_runtime_ms": 0.8956000092439353,
+    "median_rc_error": 2.7590513207442768e-11,
+    "max_rc_error": 4.534038347547842e-08
+  },
+  "optimizer_evolution": {
+    "baseline": {
+      "variant": "v0_02_raw_slsqp",
+      "label": "v0.02 原始SLSQP",
+      "objective_family": "原始RC平方差",
+      "stage_order": 1,
+      "observations": 148,
+      "solver_success_rate": 1.0,
+      "rc_pass_rate": 0.0,
+      "median_iterations": 1.0,
+      "median_runtime_ms": 0.5215499550104141,
+      "median_rc_error": 0.11322517640041921,
+      "max_rc_error": 0.29445564563216686,
+      "max_weight_sum_error": 2.220446049250313e-16,
+      "min_weight": 0.010032502697094464,
+      "median_distance_from_equal": 0.0
+    },
+    "current": {
+      "variant": "course_newton",
+      "label": "当前阻尼牛顿法",
+      "objective_family": "解析Hessian与线搜索",
+      "stage_order": 5,
+      "observations": 148,
+      "solver_success_rate": 0.9932432432432432,
+      "rc_pass_rate": 1.0,
+      "median_iterations": 8.0,
+      "median_runtime_ms": 0.3637499758042395,
+      "median_rc_error": 6.949579800519246e-13,
+      "max_rc_error": 1.6126491669821164e-09,
+      "max_weight_sum_error": 3.3306690738754696e-16,
+      "min_weight": 0.01039057011835155,
+      "median_distance_from_equal": 0.2974105937321826
+    }
+  },
+  "risk_budget_extension": {
+    "representative_date": "2025-12-31",
+    "tilted_assets": [
+      "沪深300ETF",
+      "中证1000ETF"
+    ],
+    "tilted_multiplier": 2.0,
+    "other_multiplier": 1.0,
+    "solver_success": true,
+    "iterations": 8,
+    "rc_max_error": 2.7533531010703882e-14,
+    "weight_sum_error": 0.0
   },
   "estimator_validation": {
     "sample": {
-      "annual_return": 0.08036071833347602,
-      "annual_volatility": 0.03605938742404103,
-      "sharpe": 2.1618960585064104,
-      "max_drawdown": -0.022409787864872688
+      "annual_return": 0.08036071833927072,
+      "annual_volatility": 0.03605938742490157,
+      "sharpe": 2.1618960586044778,
+      "max_drawdown": -0.022409787864873132
     },
     "ewma_full": {
-      "annual_return": 0.08345323045786301,
-      "annual_volatility": 0.03693408387837489,
-      "sharpe": 2.1889835943292684,
-      "max_drawdown": -0.028275884154097763
+      "annual_return": 0.08345323045845321,
+      "annual_volatility": 0.036934083878230786,
+      "sharpe": 2.188983594352414,
+      "max_drawdown": -0.028275884154098208
     },
     "ewma_semi": {
-      "annual_return": 0.0820305306547584,
-      "annual_volatility": 0.04208877907076626,
-      "sharpe": 1.8945262018641795,
-      "max_drawdown": -0.03408635797199244
+      "annual_return": 0.08203053065834442,
+      "annual_volatility": 0.042088779068702266,
+      "sharpe": 1.8945262020338047,
+      "max_drawdown": -0.034086357971992554
     }
   },
   "selected_parameter": {
@@ -96,10 +143,10 @@
     "selection_rule": "highest Sharpe, then less severe maximum drawdown",
     "decay": 0.9,
     "window": 252,
-    "train_sharpe": 1.9574860525367586,
-    "train_max_drawdown": -0.06081628850184595,
-    "validation_sharpe": 1.8699615980697033,
-    "validation_max_drawdown": -0.03483768309149082
+    "train_sharpe": 1.9574860518825279,
+    "train_max_drawdown": -0.06081628858216381,
+    "validation_sharpe": 1.8699615980542705,
+    "validation_max_drawdown": -0.0348376830914906
   },
   "data_quality": {
     "source": "数据/原始数据/ETF风险平价回测数据.xlsx",
@@ -127,6 +174,13 @@
       "path": "output/figures/strategy_nav.png"
     },
     {
+      "section": "优化器演进",
+      "question": "历史数值修补与凸重构分别解决了什么问题",
+      "family": "Comparison",
+      "type": "paired bars",
+      "path": "output/figures/optimizer_evolution.png"
+    },
+    {
       "section": "算法比较",
       "question": "三类算法的效率和精度如何",
       "family": "Comparison",
@@ -146,6 +200,13 @@
       "family": "Comparison",
       "type": "grouped bar",
       "path": "output/figures/weights_risk_contributions.png"
+    },
+    {
+      "section": "模型扩展",
+      "question": "一般风险预算能否准确映射为实际风险贡献",
+      "family": "Comparison",
+      "type": "grouped bars",
+      "path": "output/figures/risk_budget_extension.png"
     },
     {
       "section": "稳健性",

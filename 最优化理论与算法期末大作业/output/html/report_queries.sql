@@ -46,6 +46,35 @@ SELECT *, CASE method
 FROM read_csv_auto('output/tables/algorithm_summary.csv', header=true)
 ORDER BY method;
 
+-- optimizer_evolution_query
+SELECT variant, label, objective_family, stage_order, observations,
+       solver_success_rate, rc_pass_rate, median_iterations,
+       median_runtime_ms, median_rc_error, max_rc_error
+FROM read_csv_auto('output/tables/optimizer_evolution_summary.csv', header=true)
+ORDER BY stage_order;
+
+-- risk_budget_query
+SELECT asset, raw_budget_multiplier, target_risk_budget,
+       actual_risk_contribution, weight, absolute_rc_error,
+       CAST(representative_date AS DATE) AS representative_date
+FROM read_csv_auto('output/tables/risk_budget_extension.csv', header=true)
+ORDER BY asset;
+
+-- risk_budget_chart_query
+SELECT asset,
+       CASE measure
+         WHEN 'target_risk_budget' THEN '目标风险预算'
+         ELSE '实际风险贡献'
+       END AS measure,
+       value
+FROM (
+  UNPIVOT (
+    SELECT asset, target_risk_budget, actual_risk_contribution
+    FROM read_csv_auto('output/tables/risk_budget_extension.csv', header=true)
+  ) ON target_risk_budget, actual_risk_contribution INTO NAME measure VALUE value
+)
+ORDER BY asset, measure;
+
 -- sensitivity_query
 SELECT *, CAST(CAST("window" AS INTEGER) AS VARCHAR) AS window_label,
        printf('%.2f', decay) AS decay_label

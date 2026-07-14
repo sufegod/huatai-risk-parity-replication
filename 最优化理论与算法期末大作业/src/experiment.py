@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from .backtest import BacktestConfig, calculate_performance_metrics, run_backtest
+from .optimizer_evolution import evaluate_optimizer_evolution
 from .report import build_html_and_pdf
 from .risk_parity import estimate_covariance, risk_contributions, solve_erc
 
@@ -147,6 +148,24 @@ def _month_end_positions(index: pd.DatetimeIndex) -> list[int]:
     return positions.groupby(index.to_period("M")).last().astype(int).tolist()
 
 
+def run_optimizer_evolution(
+    returns: pd.DataFrame,
+    paths: dict[str, Path],
+    config: dict[str, Any],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    details, summary = evaluate_optimizer_evolution(
+        returns,
+        window=int(config["window"]),
+        decay=float(config["decay"]),
+        ridge=float(config["ridge"]),
+        solver_tol=float(config["solver_tol"]),
+        solver_max_iter=int(config["solver_max_iter"]),
+    )
+    details.to_csv(paths["tables"] / "optimizer_evolution_details.csv", index=False, encoding="utf-8-sig")
+    summary.to_csv(paths["tables"] / "optimizer_evolution_summary.csv", index=False, encoding="utf-8-sig")
+    return details, summary
+
+
 def run_solver_comparison(
     returns: pd.DataFrame,
     paths: dict[str, Path],
@@ -244,6 +263,71 @@ def run_solver_comparison(
     )
     optimal.to_csv(paths["tables"] / "representative_optimal_solution.csv", index=False, encoding="utf-8-sig")
     return details, summary, convergence, optimal
+
+
+def run_risk_budget_extension(
+    returns: pd.DataFrame,
+    paths: dict[str, Path],
+    config: dict[str, Any],
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    window = int(config["window"])
+    representative_cutoff = pd.Timestamp("2025-12-31")
+    positions = [
+        position
+        for position in _month_end_positions(returns.index)
+        if position >= window - 1 and returns.index[position] <= representative_cutoff
+    ]
+    if not positions:
+        raise RuntimeError("no representative window is available for the risk-budget extension")
+    position = positions[-1]
+    representative_date = returns.index[position]
+    history = returns.iloc[position - window + 1 : position + 1]
+    covariance = estimate_covariance(
+        history,
+        method="ewma_semi",
+        decay=float(config["decay"]),
+        ridge=float(config["ridge"]),
+    )
+
+    tilted_assets = ["沪深300ETF", "中证1000ETF"]
+    missing_assets = [asset for asset in tilted_assets if asset not in returns.columns]
+    if missing_assets:
+        raise ValueError(f"risk-budget extension is missing assets: {missing_assets}")
+    raw_budget = pd.Series(1.0, index=returns.columns, dtype=float)
+    raw_budget.loc[tilted_assets] = 2.0
+    target_budget = raw_budget / raw_budget.sum()
+    result = solve_erc(
+        covariance,
+        method="newton",
+        risk_budget=target_budget.to_numpy(),
+        tol=float(config["solver_tol"]),
+        max_iter=int(config["solver_max_iter"]),
+    )
+    realized = risk_contributions(result.weights, covariance)
+    extension = pd.DataFrame(
+        {
+            "asset": returns.columns,
+            "raw_budget_multiplier": raw_budget.to_numpy(),
+            "target_risk_budget": target_budget.to_numpy(),
+            "actual_risk_contribution": realized,
+            "weight": result.weights,
+            "absolute_rc_error": np.abs(realized - target_budget.to_numpy()),
+            "representative_date": representative_date,
+        }
+    )
+    extension.to_csv(paths["tables"] / "risk_budget_extension.csv", index=False, encoding="utf-8-sig")
+    summary = {
+        "representative_date": str(representative_date.date()),
+        "tilted_assets": tilted_assets,
+        "tilted_multiplier": 2.0,
+        "other_multiplier": 1.0,
+        "solver_success": bool(result.success),
+        "iterations": int(result.iterations),
+        "rc_max_error": float(extension["absolute_rc_error"].max()),
+        "weight_sum_error": float(abs(extension["weight"].sum() - 1.0)),
+    }
+    _json_dump(paths["tables"] / "risk_budget_extension_summary.json", summary)
+    return extension, summary
 
 
 def run_stress_tests(paths: dict[str, Path], config: dict[str, Any]) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -438,9 +522,11 @@ def generate_static_figures(
     nav: pd.DataFrame,
     metrics: pd.DataFrame,
     yearly: pd.DataFrame,
+    optimizer_evolution: pd.DataFrame,
     algorithm_summary: pd.DataFrame,
     convergence: pd.DataFrame,
     optimal: pd.DataFrame,
+    risk_budget_extension: pd.DataFrame,
     stress_summary: pd.DataFrame,
     estimator: pd.DataFrame,
     sensitivity: pd.DataFrame,
@@ -460,6 +546,39 @@ def generate_static_figures(
     ax.spines[["top", "right"]].set_visible(False)
     _finish_figure(fig, figures / "strategy_nav.png", "2014-01 至 2026-04；月末观察、下一交易日调仓，含单边 5bp 成本")
     chart_map.append({"section": "实证结果", "question": "风险平价是否改善风险调整后收益", "family": "Trend", "type": "multi-series line", "path": "output/figures/strategy_nav.png"})
+
+    evolution = optimizer_evolution.sort_values("stage_order")
+    evolution_labels = [label.replace(" ", "\n", 1) for label in evolution["label"]]
+    evolution_colors = [PALETTE["gray"], PALETTE["blue_light"], PALETTE["gold"], PALETTE["orange"], PALETTE["blue"]]
+    fig, axes = plt.subplots(1, 2, figsize=(10.8, 4.8))
+    bars = axes[0].bar(
+        evolution_labels,
+        evolution["rc_pass_rate"],
+        color=evolution_colors,
+        edgecolor=PALETTE["ink"],
+    )
+    axes[0].set_ylim(0, 1.08)
+    axes[0].yaxis.set_major_formatter(PercentFormatter(1.0))
+    axes[0].set_title("RC误差验收率")
+    axes[0].set_ylabel("最大RC误差不超过1e-6")
+    axes[0].bar_label(bars, labels=[f"{value:.0%}" for value in evolution["rc_pass_rate"]], padding=3, fontsize=8)
+    axes[1].bar(
+        evolution_labels,
+        evolution["median_rc_error"].clip(lower=1e-16),
+        color=evolution_colors,
+        edgecolor=PALETTE["ink"],
+    )
+    axes[1].axhline(1e-6, color=PALETTE["ink"], linestyle=":", linewidth=1.2, label="验收阈值1e-6")
+    axes[1].set_yscale("log")
+    axes[1].set_title("中位风险贡献误差")
+    axes[1].set_ylabel("绝对误差（对数轴）")
+    axes[1].legend(frameon=False, loc="upper right")
+    for ax in axes:
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.grid(axis="x", visible=False)
+        ax.tick_params(axis="x", labelsize=8)
+    _finish_figure(fig, figures / "optimizer_evolution.png", "148个相同滚动EWMA半协方差矩阵；仅改变目标函数与求解设置")
+    chart_map.append({"section": "优化器演进", "question": "历史数值修补与凸重构分别解决了什么问题", "family": "Comparison", "type": "paired bars", "path": "output/figures/optimizer_evolution.png"})
 
     fig, axes = plt.subplots(1, 2, figsize=(10.8, 4.6))
     order = ["newton", "lbfgsb", "slsqp"]
@@ -506,6 +625,29 @@ def generate_static_figures(
     fig.subplots_adjust(bottom=0.24)
     _finish_figure(fig, figures / "weights_risk_contributions.png", "权重不等于风险贡献；低波动债券获得较高名义权重")
     chart_map.append({"section": "最优解分析", "question": "不等权如何实现等风险贡献", "family": "Comparison", "type": "grouped bar", "path": "output/figures/weights_risk_contributions.png"})
+
+    extension = risk_budget_extension.copy()
+    x = np.arange(len(extension))
+    width = 0.38
+    fig, axes = plt.subplots(1, 2, figsize=(10.8, 4.8))
+    axes[0].bar(x - width / 2, extension["target_risk_budget"], width, label="目标风险预算", color=PALETTE["blue_light"], edgecolor=PALETTE["ink"])
+    axes[0].bar(x + width / 2, extension["actual_risk_contribution"], width, label="实际风险贡献", color=PALETTE["gold"], edgecolor=PALETTE["ink"])
+    axes[0].set_title("一般风险预算跟踪")
+    axes[0].set_ylabel("风险贡献占比")
+    axes[0].yaxis.set_major_formatter(PercentFormatter(1.0))
+    axes[0].legend(frameon=False, fontsize=8)
+    axes[1].bar(x, extension["weight"], color=PALETTE["blue"], edgecolor=PALETTE["ink"])
+    axes[1].set_title("对应资金权重")
+    axes[1].set_ylabel("组合权重")
+    axes[1].yaxis.set_major_formatter(PercentFormatter(1.0))
+    for ax in axes:
+        ax.set_xticks(x, extension["asset"], rotation=32, ha="right")
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.grid(axis="x", visible=False)
+        ax.tick_params(axis="x", labelsize=7.5)
+    fig.subplots_adjust(bottom=0.28)
+    _finish_figure(fig, figures / "risk_budget_extension.png", "代表窗口截至2025-12-31；两只宽基股票ETF的原始风险预算倍率设为2，其余为1")
+    chart_map.append({"section": "模型扩展", "question": "一般风险预算能否准确映射为实际风险贡献", "family": "Comparison", "type": "grouped bars", "path": "output/figures/risk_budget_extension.png"})
 
     fig, ax = plt.subplots(figsize=(8.8, 4.8))
     for method, color, marker in [("newton", PALETTE["blue"], "o"), ("lbfgsb", PALETTE["gold"], "s"), ("slsqp", PALETTE["orange"], "^")]:
@@ -573,11 +715,13 @@ def generate_static_figures(
 
 def _headline_summary(
     metrics: pd.DataFrame,
+    optimizer_evolution: pd.DataFrame,
     algorithm_summary: pd.DataFrame,
     stress_summary: pd.DataFrame,
     estimator: pd.DataFrame,
     selected: dict[str, Any],
     data_quality: dict[str, Any],
+    risk_budget_extension: dict[str, Any],
 ) -> dict[str, Any]:
     validation = metrics.loc[(metrics["strategy"] == "erc") & (metrics["period"] == "validation")].iloc[0]
     equal_validation = metrics.loc[(metrics["strategy"] == "equal_weight") & (metrics["period"] == "validation")].iloc[0]
@@ -589,6 +733,12 @@ def _headline_summary(
     newton_stress = stress_summary.loc[
         (stress_summary["method"] == "newton") & (stress_summary["condition_number"] == worst_condition)
     ].iloc[0]
+    evolution_baseline = optimizer_evolution.loc[
+        optimizer_evolution["variant"] == "v0_02_raw_slsqp"
+    ].iloc[0]
+    evolution_current = optimizer_evolution.loc[
+        optimizer_evolution["variant"] == "course_newton"
+    ].iloc[0]
     return {
         "validation_erc": validation.to_dict(),
         "validation_equal_weight": equal_validation.to_dict(),
@@ -596,6 +746,11 @@ def _headline_summary(
         "lbfgsb_summary": lbfgsb.to_dict(),
         "slsqp_summary": slsqp.to_dict(),
         "stress_newton_1e8": newton_stress.to_dict(),
+        "optimizer_evolution": {
+            "baseline": evolution_baseline.to_dict(),
+            "current": evolution_current.to_dict(),
+        },
+        "risk_budget_extension": risk_budget_extension,
         "estimator_validation": estimator_validation[["annual_return", "annual_volatility", "sharpe", "max_drawdown"]].to_dict(orient="index"),
         "selected_parameter": selected,
         "data_quality": data_quality,
@@ -609,34 +764,48 @@ def generate_all_outputs(config_path: Path) -> None:
     _ensure_output_dirs(paths)
     config = _load_config(config_path)
 
-    print("[1/8] 清洗数据并执行数据质量检查...")
+    print("[1/9] 清洗数据并执行数据质量检查...")
     returns, _, data_quality = load_and_clean_returns(paths, config)
-    print("[2/8] 比较阻尼牛顿法、L-BFGS-B 与 SLSQP...")
+    print("[2/9] 复现历史优化器演进并统一执行RC误差验收...")
+    _, optimizer_evolution = run_optimizer_evolution(returns, paths, config)
+    print("[3/9] 比较当前阻尼牛顿法、L-BFGS-B 与 SLSQP...")
     _, algorithm_summary, convergence, optimal = run_solver_comparison(returns, paths, config)
-    print("[3/8] 执行病态矩阵压力测试...")
+    print("[4/9] 演示一般风险预算并执行病态矩阵压力测试...")
+    risk_budget_extension, risk_budget_summary = run_risk_budget_extension(returns, paths, config)
     _, stress_summary = run_stress_tests(paths, config)
-    print("[4/8] 回测等权、逆下行波动率与风险平价策略...")
+    print("[5/9] 回测等权、逆下行波动率与风险平价策略...")
     _, nav, metrics, yearly = run_strategy_backtests(returns, paths, config)
-    print("[5/8] 比较风险估计方法并运行参数敏感性实验...")
+    print("[6/9] 比较风险估计方法并运行参数敏感性实验...")
     estimator = run_estimator_comparison(returns, paths, config)
     sensitivity, selected = run_parameter_sensitivity(returns, paths, config)
-    print("[6/8] 生成静态图表...")
+    print("[7/9] 生成静态图表...")
     chart_map = generate_static_figures(
         paths,
         nav,
         metrics,
         yearly,
+        optimizer_evolution,
         algorithm_summary,
         convergence,
         optimal,
+        risk_budget_extension,
         stress_summary,
         estimator,
         sensitivity,
     )
-    summary = _headline_summary(metrics, algorithm_summary, stress_summary, estimator, selected, data_quality)
+    summary = _headline_summary(
+        metrics,
+        optimizer_evolution,
+        algorithm_summary,
+        stress_summary,
+        estimator,
+        selected,
+        data_quality,
+        risk_budget_summary,
+    )
     summary["chart_map"] = chart_map
     summary["config"] = config
     _json_dump(paths["tables"] / "analysis_summary.json", summary)
-    print("[7/8] 构建自包含技术报告 HTML 并导出 PDF...")
+    print("[8/9] 构建自包含技术报告 HTML 并导出 PDF...")
     build_html_and_pdf(course_dir, config, summary)
-    print("[8/8] 全部输出已生成。")
+    print("[9/9] 全部输出已生成。")

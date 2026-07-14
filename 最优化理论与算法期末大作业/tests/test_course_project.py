@@ -15,11 +15,21 @@ if str(COURSE_DIR) not in sys.path:
     sys.path.insert(0, str(COURSE_DIR))
 
 from src.backtest import BacktestConfig, run_backtest
+from src.optimizer_evolution import (
+    OPTIMIZER_VARIANTS,
+    evaluate_optimizer_evolution,
+    historical_convex_gradient,
+    historical_convex_objective,
+    relative_erc_objective,
+    scaled_erc_objective,
+    solve_optimizer_variant,
+)
 from src.risk_parity import (
     convex_gradient,
     convex_hessian,
     convex_objective,
     estimate_covariance,
+    original_erc_objective,
     risk_contributions,
     solve_erc,
 )
@@ -78,6 +88,15 @@ class RiskParityModelTests(unittest.TestCase):
             np.testing.assert_allclose(result.weights, expected, atol=2e-6)
             self.assertLess(result.rc_max_error, 1e-6)
 
+    def test_general_risk_budget_matches_diagonal_closed_form(self):
+        diagonal = np.diag(np.square([0.10, 0.20, 0.40, 0.80]))
+        budget = np.array([0.4, 0.3, 0.2, 0.1])
+        expected = np.sqrt(budget / np.diag(diagonal))
+        expected /= expected.sum()
+        result = solve_erc(diagonal, method="newton", risk_budget=budget, tol=1e-10)
+        np.testing.assert_allclose(result.weights, expected, atol=2e-8)
+        np.testing.assert_allclose(risk_contributions(result.weights, diagonal), budget, atol=1e-8)
+
     def test_solvers_agree_and_obey_constraints(self):
         results = {method: solve_erc(self.covariance, method=method) for method in ("newton", "lbfgsb", "slsqp")}
         for result in results.values():
@@ -98,6 +117,71 @@ class RiskParityModelTests(unittest.TestCase):
         returns = rng.normal(0.0, 0.01, size=(252, 9))
         covariance = estimate_covariance(returns, method="ewma_semi", decay=0.97, ridge=1e-8)
         self.assertGreater(np.linalg.eigvalsh(covariance).min(), 0.0)
+
+
+class OptimizerEvolutionTests(unittest.TestCase):
+    def setUp(self):
+        self.covariance = np.array(
+            [
+                [0.040, 0.006, 0.002],
+                [0.006, 0.090, 0.004],
+                [0.002, 0.004, 0.160],
+            ],
+            dtype=float,
+        )
+        self.weights = np.array([0.25, 0.35, 0.40])
+        self.budget = np.full(3, 1.0 / 3.0)
+
+    def test_absolute_objective_changes_quadratically_with_covariance_scale(self):
+        base = original_erc_objective(self.weights, self.covariance, self.budget)
+        scaled = original_erc_objective(self.weights, self.covariance * 7.0, self.budget)
+        self.assertAlmostEqual(scaled, base * 49.0, places=12)
+
+    def test_v003_objective_is_exactly_original_times_one_billion(self):
+        base = original_erc_objective(self.weights, self.covariance, self.budget)
+        self.assertAlmostEqual(scaled_erc_objective(self.weights, self.covariance), base * 1e9, places=8)
+
+    def test_v004_relative_objective_is_scale_invariant(self):
+        base = relative_erc_objective(self.weights, self.covariance)
+        scaled = relative_erc_objective(self.weights, self.covariance * 13.0)
+        self.assertAlmostEqual(base, scaled, places=12)
+
+    def test_v005_analytic_gradient_matches_finite_difference(self):
+        x = np.array([0.8, 1.1, 1.4])
+        step = 1e-6
+        numerical = np.empty_like(x)
+        for i in range(len(x)):
+            upper = x.copy()
+            lower = x.copy()
+            upper[i] += step
+            lower[i] -= step
+            numerical[i] = (
+                historical_convex_objective(upper, self.covariance)
+                - historical_convex_objective(lower, self.covariance)
+            ) / (2 * step)
+        np.testing.assert_allclose(
+            historical_convex_gradient(x, self.covariance), numerical, rtol=1e-6, atol=1e-8
+        )
+
+    def test_all_controlled_variants_return_feasible_weights(self):
+        for variant in OPTIMIZER_VARIANTS:
+            with self.subTest(variant=variant):
+                result = solve_optimizer_variant(self.covariance, variant)
+                self.assertAlmostEqual(float(result.weights.sum()), 1.0, places=10)
+                self.assertGreaterEqual(result.min_weight, -1e-12)
+
+    def test_full_controlled_experiment_contains_740_diagnostics(self):
+        returns = pd.read_csv(COURSE_DIR / "data" / "etf_returns.csv", index_col=0, parse_dates=True)
+        details, summary = evaluate_optimizer_evolution(returns)
+        self.assertEqual(len(details), 740)
+        self.assertEqual(len(summary), 5)
+        self.assertTrue((details.groupby("variant").size() == 148).all())
+        self.assertGreaterEqual(float(details["min_weight"].min()), -1e-12)
+        accepted = details.loc[details["rc_pass"]]
+        self.assertLessEqual(float(accepted["weight_sum_error"].max()), 1e-10)
+        current = details.loc[details["variant"] == "course_newton"]
+        self.assertTrue(current["rc_pass"].all())
+        self.assertLessEqual(float(current["weight_sum_error"].max()), 1e-10)
 
 
 class BacktestTests(unittest.TestCase):

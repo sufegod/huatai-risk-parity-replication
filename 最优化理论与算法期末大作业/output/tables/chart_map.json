@@ -7,6 +7,13 @@
     "path": "output/figures/strategy_nav.png"
   },
   {
+    "section": "优化器演进",
+    "question": "历史数值修补与凸重构分别解决了什么问题",
+    "family": "Comparison",
+    "type": "paired bars",
+    "path": "output/figures/optimizer_evolution.png"
+  },
+  {
     "section": "算法比较",
     "question": "三类算法的效率和精度如何",
     "family": "Comparison",
@@ -26,6 +33,13 @@
     "family": "Comparison",
     "type": "grouped bar",
     "path": "output/figures/weights_risk_contributions.png"
+  },
+  {
+    "section": "模型扩展",
+    "question": "一般风险预算能否准确映射为实际风险贡献",
+    "family": "Comparison",
+    "type": "grouped bars",
+    "path": "output/figures/risk_budget_extension.png"
   },
   {
     "section": "稳健性",

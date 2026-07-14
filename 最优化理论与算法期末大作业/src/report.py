@@ -97,6 +97,35 @@ SELECT *, CASE method
 FROM read_csv_auto('output/tables/algorithm_summary.csv', header=true)
 ORDER BY method
 """.strip(),
+        "optimizer_evolution_query": """
+SELECT variant, label, objective_family, stage_order, observations,
+       solver_success_rate, rc_pass_rate, median_iterations,
+       median_runtime_ms, median_rc_error, max_rc_error
+FROM read_csv_auto('output/tables/optimizer_evolution_summary.csv', header=true)
+ORDER BY stage_order
+""".strip(),
+        "risk_budget_query": """
+SELECT asset, raw_budget_multiplier, target_risk_budget,
+       actual_risk_contribution, weight, absolute_rc_error,
+       CAST(representative_date AS DATE) AS representative_date
+FROM read_csv_auto('output/tables/risk_budget_extension.csv', header=true)
+ORDER BY asset
+""".strip(),
+        "risk_budget_chart_query": """
+SELECT asset,
+       CASE measure
+         WHEN 'target_risk_budget' THEN '目标风险预算'
+         ELSE '实际风险贡献'
+       END AS measure,
+       value
+FROM (
+  UNPIVOT (
+    SELECT asset, target_risk_budget, actual_risk_contribution
+    FROM read_csv_auto('output/tables/risk_budget_extension.csv', header=true)
+  ) ON target_risk_budget, actual_risk_contribution INTO NAME measure VALUE value
+)
+ORDER BY asset, measure
+""".strip(),
         "sensitivity_query": """
 SELECT *, CAST(CAST("window" AS INTEGER) AS VARCHAR) AS window_label,
        printf('%.2f', decay) AS decay_label
@@ -168,6 +197,9 @@ UNION ALL SELECT '清洗后缺失单元格', (SELECT count(*) FROM long_clean WH
     nav_monthly = frames["nav_query"]
     performance = frames["performance_query"]
     algorithms = frames["algorithm_query"]
+    optimizer_evolution = frames["optimizer_evolution_query"]
+    risk_budget = frames["risk_budget_query"]
+    risk_budget_long = frames["risk_budget_chart_query"]
     sensitivity_validation = frames["sensitivity_query"]
     optimal_long = frames["optimal_query"]
     estimator_validation = frames["estimator_query"]
@@ -184,6 +216,8 @@ UNION ALL SELECT '清洗后缺失单元格', (SELECT count(*) FROM long_clean WH
     validation_equal = summary["validation_equal_weight"]
     selected = summary["selected_parameter"]
     data_quality = summary["data_quality"]
+    evolution_summary = summary["optimizer_evolution"]
+    risk_budget_summary = summary["risk_budget_extension"]
     sources = [
         {
             "id": "etf_data",
@@ -203,12 +237,21 @@ UNION ALL SELECT '清洗后缺失单元格', (SELECT count(*) FROM long_clean WH
             "path": "策略研报来源/金工_ 从资产配置走向因子配置：中国版全天候增强策略.pdf",
             "description": "用于风险平价与宏观因子配置的研究背景，不复制其中图表。",
         },
+        {
+            "id": "historical_versions",
+            "label": "风险平价历史策略版本",
+            "path": "策略复现与回测/历史策略版本/",
+            "description": "v0.01至v0.06的优化器迭代，以及v0.15、v0.16_2和v0.16_3的模型扩展来源。",
+        },
     ]
     query_descriptions = {
         "headline_query": "从策略绩效表抽取风险平价验证期核心指标。",
         "nav_query": "将日净值转换为月末长表，供累计净值图使用。",
         "performance_query": "抽取训练期和验证期的三策略绩效。",
         "algorithm_query": "抽取滚动窗口求解器效率与精度摘要。",
+        "optimizer_evolution_query": "抽取历史优化器受控复现实验的验收率、迭代数与误差。",
+        "risk_budget_query": "抽取一般风险预算演示的目标预算、实际贡献与资金权重。",
+        "risk_budget_chart_query": "将目标风险预算和实际风险贡献转换为长表。",
         "sensitivity_query": "抽取12组参数的样本外敏感性结果。",
         "optimal_query": "将代表窗口权重和风险贡献转换为长表。",
         "estimator_query": "抽取三类风险估计方法的样本外表现。",
@@ -283,6 +326,18 @@ UNION ALL SELECT '清洗后缺失单元格', (SELECT count(*) FROM long_clean WH
             },
         },
         {
+            "id": "optimizer_evolution_chart",
+            "title": "历史优化器迭代的RC误差验收率",
+            "description": "148个相同滚动风险矩阵；求解器success与RC误差达标分别统计。",
+            "type": "bar",
+            "dataset": "optimizer_evolution",
+            "sourceId": "optimizer_evolution_query",
+            "encodings": {
+                "x": {"field": "label", "type": "nominal"},
+                "y": {"field": "rc_pass_rate", "type": "quantitative"},
+            },
+        },
+        {
             "id": "sensitivity_chart",
             "title": "参数组合的样本外夏普比率",
             "description": "验证期为2021年1月至2026年4月；参数选择只使用训练期。",
@@ -318,6 +373,19 @@ UNION ALL SELECT '清洗后缺失单元格', (SELECT count(*) FROM long_clean WH
             "encodings": {
                 "x": {"field": "algorithm", "type": "nominal"},
                 "y": {"field": "max_rc_error", "type": "quantitative"},
+            },
+        },
+        {
+            "id": "risk_budget_chart",
+            "title": "一般风险预算的目标与实际贡献",
+            "description": "代表窗口中两只宽基股票ETF预算倍率为2，其余资产为1。",
+            "type": "bar",
+            "dataset": "risk_budget_long",
+            "sourceId": "risk_budget_chart_query",
+            "encodings": {
+                "x": {"field": "asset", "type": "nominal"},
+                "y": {"field": "value", "type": "quantitative"},
+                "color": {"field": "measure", "type": "nominal"},
             },
         },
     ]
@@ -358,6 +426,23 @@ UNION ALL SELECT '清洗后缺失单元格', (SELECT count(*) FROM long_clean WH
             ],
         },
         {
+            "id": "optimizer_evolution_table",
+            "title": "历史优化器受控复现实验",
+            "description": "固定数据、协方差和风险预算，只改变目标函数与求解设置。",
+            "dataset": "optimizer_evolution",
+            "sourceId": "optimizer_evolution_query",
+            "defaultSort": {"field": "stage_order", "direction": "asc"},
+            "columns": [
+                {"field": "stage_order", "label": "序号", "format": "number"},
+                {"field": "label", "label": "阶段"},
+                {"field": "objective_family", "label": "核心变化"},
+                {"field": "solver_success_rate", "label": "求解器成功率", "format": "percent"},
+                {"field": "rc_pass_rate", "label": "RC验收率", "format": "percent"},
+                {"field": "median_iterations", "label": "中位迭代", "format": "number"},
+                {"field": "median_rc_error", "label": "中位RC误差", "format": "number"},
+            ],
+        },
+        {
             "id": "estimator_table",
             "title": "风险估计方法的样本外表现",
             "description": "窗口252日、EWMA衰减0.97；样本协方差不使用衰减参数。",
@@ -385,10 +470,29 @@ UNION ALL SELECT '清洗后缺失单元格', (SELECT count(*) FROM long_clean WH
                 {"field": "result", "label": "结论"},
             ],
         },
+        {
+            "id": "risk_budget_table",
+            "title": "一般风险预算代表解",
+            "description": "该实验验证目标风险预算的可实现性，不用于宣称收益提升。",
+            "dataset": "risk_budget",
+            "sourceId": "risk_budget_query",
+            "defaultSort": {"field": "asset", "direction": "asc"},
+            "columns": [
+                {"field": "asset", "label": "资产"},
+                {"field": "raw_budget_multiplier", "label": "预算倍率", "format": "number"},
+                {"field": "target_risk_budget", "label": "目标风险预算", "format": "percent"},
+                {"field": "actual_risk_contribution", "label": "实际风险贡献", "format": "percent"},
+                {"field": "weight", "label": "资金权重", "format": "percent"},
+            ],
+        },
     ]
 
     technical_summary = (
         f"## 技术摘要\n\n"
+        f"**历史迭代揭示了从假收敛到严格验收的路径。** 原始SLSQP在统一实验中的RC验收率为"
+        f"{_pct(evolution_summary['baseline']['rc_pass_rate'])}，当前阻尼牛顿法为"
+        f"{_pct(evolution_summary['current']['rc_pass_rate'])}。目标放大和相对误差属于数值修补，"
+        f"对数障碍凸重构才是模型结构的根本变化。\n\n"
         f"**凸重构得到稳定、可审计的等风险贡献解。** 在{data_quality['rows']}个交易日、9类资产上，"
         f"自实现阻尼牛顿法的滚动窗口中位迭代次数为{_fmt(summary['newton_summary']['median_iterations'], 0)}次，"
         f"最大风险贡献误差为{summary['newton_summary']['max_rc_error']:.2e}。\n\n"
@@ -449,6 +553,31 @@ UNION ALL SELECT '清洗后缺失单元格', (SELECT count(*) FROM long_clean WH
             ),
         },
         {"id": "quality_table_block", "type": "table", "tableId": "quality_table"},
+        {
+            "id": "optimizer_evolution_method",
+            "type": "markdown",
+            "sourceId": "historical_versions",
+            "body": (
+                "## 优化器演进：从数值修补走向凸重构\n\n"
+                "v0.01使用原始风险贡献平方差与SLSQP；v0.02修正收益单位和资产名称，因此不能把两版绩效差异归因于优化器。"
+                "v0.03把目标放大1e9并收紧停止条件，v0.04改用无量纲相对RC误差，这两步主要处理目标尺度和假收敛。"
+                "v0.05转向对数障碍严格凸模型并提供解析梯度，v0.06再以EWMA下行二阶矩和对角扰动改善风险输入。"
+                "当前课程实现继续加入解析Hessian、阻尼步长、Armijo回溯和解后RC验收。"
+            ),
+        },
+        {"id": "optimizer_evolution_chart_block", "type": "chart", "chartId": "optimizer_evolution_chart"},
+        {
+            "id": "optimizer_evolution_interpretation",
+            "type": "markdown",
+            "sourceId": "optimizer_evolution_query",
+            "body": (
+                f"在148个完全相同的滚动EWMA半协方差矩阵上，v0.02原始SLSQP的RC验收率为"
+                f"**{_pct(evolution_summary['baseline']['rc_pass_rate'])}**，而当前阻尼牛顿法为"
+                f"**{_pct(evolution_summary['current']['rc_pass_rate'])}**。SciPy返回success只表示其自身停止条件成立，"
+                "不等于风险贡献已经达标，因此报告始终将求解器状态和RC误差验收分开。"
+            ),
+        },
+        {"id": "optimizer_evolution_table_block", "type": "table", "tableId": "optimizer_evolution_table"},
         {
             "id": "model_specification",
             "type": "markdown",
@@ -551,14 +680,38 @@ UNION ALL SELECT '清洗后缺失单元格', (SELECT count(*) FROM long_clean WH
         },
         {"id": "optimal_chart_block", "type": "chart", "chartId": "optimal_chart"},
         {
+            "id": "risk_budget_extension_method",
+            "type": "markdown",
+            "sourceId": "historical_versions",
+            "body": (
+                "## 从等风险贡献扩展到动态可行域与一般风险预算\n\n"
+                "v0.15按照资产上市状态改变进入优化器的资产集合，可理解为随时间变化的可行资产域。"
+                "v0.16_2将常数预算bᵢ=1/n推广为信号条件化预算向量，信号只改变目标风险贡献，不直接指定资金仓位。"
+                "代表窗口演示把沪深300ETF和中证1000ETF的原始预算倍率设为2，其余资产为1；"
+                f"求解后最大预算跟踪误差为**{risk_budget_summary['rc_max_error']:.2e}**。"
+            ),
+        },
+        {"id": "risk_budget_chart_block", "type": "chart", "chartId": "risk_budget_chart"},
+        {"id": "risk_budget_table_block", "type": "table", "tableId": "risk_budget_table"},
+        {
+            "id": "volatility_overlay_boundary",
+            "type": "markdown",
+            "sourceId": "historical_versions",
+            "body": (
+                "v0.16_3按近60日实现波动率缩放股指资金仓位，再把剩余资金交给风险平价模块。"
+                "它是优化器外部的组合构建与风险覆盖规则，并未改变凸目标、梯度或Hessian，故不将其表述为优化器升级。"
+            ),
+        },
+        {
             "id": "limitations_next",
             "type": "markdown",
             "body": (
                 "## 结论、局限与下一步\n\n"
-                "1. 对数障碍凸重构给出唯一全局解，阻尼牛顿法以少量迭代达到严格风险贡献误差。  \n"
-                "2. 历史样本中，风险平价主要通过降低波动和回撤改善风险调整后收益，而非保证最高年化收益。  \n"
-                "3. ETF成立前指数代理、固定交易成本、零无风险利率、参数网格多重比较和2026年不完整年度限制外推。  \n"
-                "4. 后续可加入协方差收缩、权重上限、换手惩罚和滚动交叉验证，并检验不同交易成本。\n\n"
+                "1. 历史迭代说明目标尺度修补能缓解假收敛，但严格凸重构和独立RC验收才带来结构性可靠性。  \n"
+                "2. 对数障碍凸模型给出唯一全局解，阻尼牛顿法以少量迭代达到严格风险贡献误差。  \n"
+                "3. 一般风险预算可准确实现非等额目标，动态可行域和外部波动覆盖则属于更上层的组合约束。  \n"
+                "4. 历史样本中，风险平价主要通过降低波动和回撤改善风险调整后收益，而非保证最高年化收益。  \n"
+                "5. ETF成立前指数代理、固定交易成本、零无风险利率和2026年不完整年度限制外推。\n\n"
                 "## 进一步问题\n\n"
                 "在债券低利率或股债相关性上升阶段，等风险贡献是否仍能保持分散效果？"
                 "引入权重上限和换手惩罚后，凸性、最优性条件与样本外表现将如何变化？\n\n"
@@ -567,7 +720,7 @@ UNION ALL SELECT '清洗后缺失单元格', (SELECT count(*) FROM long_clean WH
                 "[2] Spinu F. An Algorithm for Computing Risk Parity Weights, 2013.  \n"
                 "[3] Nocedal J, Wright S. Numerical Optimization, 2nd ed., 2006.  \n"
                 "[4] 华泰研究. 从资产配置走向因子配置：中国版全天候增强策略, 2025.  \n"
-                "[5] 本项目 v0.01 与 v0.05 风险平价历史代码及本课程复现实验。"
+                "[5] 本项目 v0.01-v0.06、v0.15、v0.16_2与v0.16_3历史代码及本课程受控复现实验。"
             ),
         },
     ]
@@ -588,6 +741,9 @@ UNION ALL SELECT '清洗后缺失单元格', (SELECT count(*) FROM long_clean WH
         "nav_monthly": _records(nav_monthly),
         "performance": _records(performance),
         "algorithm_summary": _records(algorithms),
+        "optimizer_evolution": _records(optimizer_evolution),
+        "risk_budget": _records(risk_budget),
+        "risk_budget_long": _records(risk_budget_long),
         "sensitivity_validation": _records(sensitivity_validation),
         "optimal_solution": _records(optimal_long),
         "estimator_validation": _records(estimator_validation),
@@ -697,6 +853,8 @@ def _build_print_report(course_dir: Path, config: dict[str, Any], summary: dict[
 
     metrics = pd.read_csv(course_dir / "output" / "tables" / "strategy_metrics.csv")
     algorithms = pd.read_csv(course_dir / "output" / "tables" / "algorithm_summary.csv")
+    evolution = pd.read_csv(course_dir / "output" / "tables" / "optimizer_evolution_summary.csv")
+    risk_budget = pd.read_csv(course_dir / "output" / "tables" / "risk_budget_extension.csv")
     estimators = pd.read_csv(course_dir / "output" / "tables" / "estimator_comparison.csv")
     sensitivity = pd.read_csv(course_dir / "output" / "tables" / "parameter_sensitivity.csv")
     optimum = pd.read_csv(course_dir / "output" / "tables" / "representative_optimal_solution.csv")
@@ -711,6 +869,17 @@ def _build_print_report(course_dir: Path, config: dict[str, Any], summary: dict[
             f"{row['median_runtime_ms']:.3f}",
             f"{row['median_rc_error']:.2e}",
             f"{row['max_rc_error']:.2e}",
+        ])
+
+    evolution_rows = []
+    for _, row in evolution.sort_values("stage_order").iterrows():
+        evolution_rows.append([
+            row["label"],
+            row["objective_family"],
+            f"{row['solver_success_rate']:.1%}",
+            f"{row['rc_pass_rate']:.1%}",
+            f"{row['median_iterations']:.1f}",
+            f"{row['median_rc_error']:.2e}",
         ])
 
     validation_rows = []
@@ -752,16 +921,30 @@ def _build_print_report(course_dir: Path, config: dict[str, Any], summary: dict[
             row["asset"], f"{row['weight']:.2%}", f"{row['risk_contribution']:.4%}", f"{row['target_risk_contribution']:.4%}"
         ])
 
+    risk_budget_rows = []
+    for _, row in risk_budget.iterrows():
+        risk_budget_rows.append([
+            row["asset"],
+            f"{row['raw_budget_multiplier']:.0f}",
+            f"{row['target_risk_budget']:.2%}",
+            f"{row['actual_risk_contribution']:.2%}",
+            f"{row['weight']:.2%}",
+        ])
+
     dq = summary["data_quality"]
     selected = summary["selected_parameter"]
     validation_erc = summary["validation_erc"]
     validation_equal = summary["validation_equal_weight"]
+    evolution_baseline = summary["optimizer_evolution"]["baseline"]
+    evolution_current = summary["optimizer_evolution"]["current"]
+    risk_budget_summary = summary["risk_budget_extension"]
     missing_assets = int(quality_profile["missing_before_fill"].sum())
+    total_pages = 12
 
     def page(number: int, title: str, body: str, *, cover: bool = False) -> str:
         cover_class = " page-cover" if cover else ""
         heading = "" if cover else f'<div class="running-head"><span>最优化理论与算法期末大作业</span><span>{number:02d}</span></div><h1>{esc(title)}</h1>'
-        return f'<section class="page{cover_class}">{heading}{body}<div class="page-no">{number} / 10</div></section>'
+        return f'<section class="page{cover_class}">{heading}{body}<div class="page-no">{number} / {total_pages}</div></section>'
 
     pages: list[str] = []
     pages.append(page(1, "封面", f"""
@@ -775,8 +958,8 @@ def _build_print_report(course_dir: Path, config: dict[str, Any], summary: dict[
         <div><b>完成日期</b><span>2026年7月13日</span></div>
       </div>
       <div class="abstract"><h2>摘要</h2>
-        <p>本文研究多资产配置中的等风险贡献优化。针对原始风险贡献平方差模型尺度小、非凸且数值敏感的问题，采用对数障碍严格凸重构，推导梯度、Hessian 与 KKT 条件，并自行实现保持正权重的阻尼牛顿法。基于项目内9类ETF代理资产2013—2026年日收益，使用252日、衰减系数0.97的 EWMA 半协方差进行月度滚动回测，并与 L-BFGS-B、SLSQP、等权和逆下行波动率方法比较。结果表明，验证期风险平价年化收益为{validation_erc['annual_return']:.2%}、年化波动为{validation_erc['annual_volatility']:.2%}、夏普为{validation_erc['sharpe']:.2f}，其优势主要来自风险控制而非最高绝对收益。</p>
-        <p class="keywords"><b>关键词：</b>风险平价；EWMA半协方差；凸优化；阻尼牛顿法；资产配置</p>
+        <p>本文研究多资产配置中的等风险贡献优化，并复盘项目从原始SLSQP、目标放大、相对误差到对数障碍凸重构的优化器演进。为排除数据修正与策略变化的干扰，在148个相同EWMA半协方差矩阵上统一比较历史求解设置，再推导梯度、Hessian与KKT条件并实现保持正权重的阻尼牛顿法。基于9类ETF代理资产2013—2026年日收益，风险平价验证期年化收益为{validation_erc['annual_return']:.2%}、波动为{validation_erc['annual_volatility']:.2%}、夏普为{validation_erc['sharpe']:.2f}；其优势主要来自风险控制而非最高绝对收益。</p>
+        <p class="keywords"><b>关键词：</b>优化器演进；风险平价；凸重构；阻尼牛顿法；一般风险预算</p>
       </div>
       <div class="highlight-row">
         <div><b>{validation_erc['sharpe']:.2f}</b><span>验证期夏普</span></div>
@@ -804,95 +987,112 @@ def _build_print_report(course_dir: Path, config: dict[str, Any], summary: dict[
       <p class="source">资料来源：项目原始Excel、清洗后CSV及华泰研究研报；数据质量统计由程序生成。</p>
     """))
 
-    pages.append(page(3, "2　数学模型与凸等价重构", """
-      <h2>2.1 原始等风险贡献模型</h2>
+    pages.append(page(3, "2　历史优化器演进与受控复现", f"""
+      <h2>2.1 从修补停止条件到改变问题结构</h2>
+      <div class="method-strip"><span>v0.02 原始SLSQP</span><b>→</b><span>v0.03 目标放大</span><b>→</b><span>v0.04 相对误差</span><b>→</b><span>v0.05 凸重构</span><b>→</b><span>当前牛顿法</span></div>
+      <p>v0.01使用原始RC平方差目标；v0.02修正收益单位和资产名称，并未改变优化器。v0.03将目标放大10<sup>9</sup>并收紧停止条件，v0.04改用无量纲相对RC误差，均属于数值尺度修补。v0.05改用对数障碍严格凸目标与解析梯度，是理论结构的根本跃迁；v0.06再引入EWMA下行二阶矩及10<sup>−8</sup>I正则化。</p>
+      {figure('optimizer_evolution.png', '图1　历史优化器受控复现：RC验收率与中位误差', compact=True)}
+      {table(['阶段','核心变化','求解成功','RC验收','中位迭代','中位RC误差'], evolution_rows, small=True)}
+      <div class="callout"><b>统一口径：</b>固定148个滚动EWMA半协方差矩阵、等风险预算和1×10<sup>−6</sup>验收线，只改变目标函数与求解设置。原始SLSQP的RC验收率为{evolution_baseline['rc_pass_rate']:.1%}，当前牛顿法为{evolution_current['rc_pass_rate']:.1%}。求解器返回success不等于风险贡献已经达标。</div>
+      <p class="source">资料来源：历史版本v0.01—v0.06；output/tables/optimizer_evolution_summary.csv。</p>
+    """))
+
+    pages.append(page(4, "3　数学模型与凸等价重构", """
+      <h2>3.1 原始等风险贡献模型</h2>
       <p>设资产权重为 <i>w</i>，满足 <i>w</i><sub>i</sub>≥0 且 1ᵀ<i>w</i>=1。组合方差与第 <i>i</i> 个资产的风险贡献分别为：</p>
       <div class="equation">σ²(<i>w</i>) = <i>w</i>ᵀΣ<i>w</i>，　RC<sub>i</sub> = <i>w</i><sub>i</sub>(Σ<i>w</i>)<sub>i</sub></div>
-      <p>等风险贡献可直接写为下列带等式约束的四次优化：</p>
+      <p>等风险贡献可直接写为带等式约束的四次优化：</p>
       <div class="equation">min<sub><i>w</i></sub>　Σ<sub>i</sub>[RC<sub>i</sub> − <i>w</i>ᵀΣ<i>w</i>/n]²</div>
-      <p>该目标随协方差尺度显著变化，并非全局凸；直接使用SLSQP容易受到初值、停止阈值和病态矩阵影响。</p>
-      <h2>2.2 对数障碍严格凸重构</h2>
+      <p>该目标随协方差尺度显著变化，并非全局凸；历史v0.03和v0.04正是分别从放大目标与无量纲化角度缓解这一问题。</p>
+      <h2>3.2 对数障碍严格凸重构</h2>
       <div class="equation strong">min<sub><i>x</i>&gt;0</sub>　f(<i>x</i>) = ½<i>x</i>ᵀΣ<i>x</i> − Σ<sub>i</sub>b<sub>i</sub>ln <i>x</i><sub>i</sub>，　b<sub>i</sub>=1/n</div>
-      <p>求解后归一化 <i>w</i>=<i>x</i>/(1ᵀ<i>x</i>)。主实验使用负收益 <i>r</i><sub>t</sub><sup>−</sup>=min(<i>r</i><sub>t</sub>,0) 构造 EWMA 半协方差，并加入10<sup>−8</sup>I：</p>
+      <p>求解后归一化 <i>w</i>=<i>x</i>/(1ᵀ<i>x</i>)。主实验使用负收益 <i>r</i><sub>t</sub><sup>−</sup>=min(<i>r</i><sub>t</sub>,0) 构造 EWMA 下行二阶矩，并加入10<sup>−8</sup>I：</p>
       <div class="equation">Σ = Σ<sub>t</sub> α<sub>t</sub><i>r</i><sub>t</sub><sup>−</sup>(<i>r</i><sub>t</sub><sup>−</sup>)ᵀ + 10<sup>−8</sup>I，　α<sub>t</sub>∝0.97<sup>T−t</sup></div>
-      <h2>2.3 梯度、Hessian 与最优性证明</h2>
+      <h2>3.3 梯度、Hessian 与最优性证明</h2>
       <div class="equation">∇f(<i>x</i>)=Σ<i>x</i>−<i>b</i>/<i>x</i>，　∇²f(<i>x</i>)=Σ+diag(<i>b</i>/<i>x</i>²)</div>
       <div class="proof"><b>命题：</b>该模型存在唯一最优解，归一化后满足给定风险预算。<br><b>证明：</b>脊参数使Σ正定，且diag(<i>b</i>/<i>x</i>²)正定，因此Hessian处处正定，f严格凸。最优点满足Σ<i>x</i>−<i>b</i>/<i>x</i>=0，即 <i>x</i><sub>i</sub>(Σ<i>x</i>)<sub>i</sub>=b<sub>i</sub>。归一化只对全部风险贡献乘同一尺度，故相对风险贡献等于b<sub>i</sub>；严格凸性保证最优解唯一。证毕。</div>
       <p class="source">资料来源：模型推导由本文完成；理论背景参考 Maillard 等（2010）与 Spinu（2013）。</p>
     """))
 
-    pages.append(page(4, "3　阻尼牛顿法与求解器比较", f"""
+    pages.append(page(5, "4　阻尼牛顿法与当前求解器比较", f"""
       <div class="two-col text-cols">
-        <div><h2>3.1 自实现算法</h2><div class="pseudo"><b>输入：</b>Σ、风险预算b、tol=10<sup>−10</sup><br>1　初始化 x&gt;0<br>2　计算 g=Σx−b/x，H=Σ+diag(b/x²)<br>3　解 Hp=−g<br>4　由 x+αp&gt;0 得到最大可行步长<br>5　Armijo 回溯：f(x+αp)≤f(x)+10<sup>−4</sup>αgᵀp<br>6　若 ‖g‖∞≤tol 则停止，否则返回第2步<br><b>输出：</b>w=x/(1ᵀx)</div></div>
-        <div><h2>3.2 对照算法</h2><p><b>L-BFGS-B：</b>求解同一凸模型，使用解析梯度与正下界。</p><p><b>SLSQP：</b>求解原始风险贡献平方差模型，显式施加权重和为1及非负约束，并按协方差量级缩放目标。</p><p>三者统一上限1000次；比较成功率、迭代数、耗时和最大风险贡献误差。</p></div>
+        <div><h2>4.1 自实现算法</h2><div class="pseudo"><b>输入：</b>Σ、风险预算b、tol=10<sup>−10</sup><br>1　初始化 x&gt;0<br>2　计算 g=Σx−b/x，H=Σ+diag(b/x²)<br>3　解 Hp=−g<br>4　由 x+αp&gt;0 得到最大可行步长<br>5　Armijo 回溯：f(x+αp)≤f(x)+10<sup>−4</sup>αgᵀp<br>6　若 ‖g‖∞≤tol 则停止，否则返回第2步<br><b>输出：</b>w=x/(1ᵀx)</div></div>
+        <div><h2>4.2 对照算法</h2><p><b>L-BFGS-B：</b>求解同一凸模型，使用解析梯度、梯度停止条件与正下界。</p><p><b>SLSQP：</b>求解原始RC平方差模型，显式施加权重和为1及非负约束，并按协方差量级缩放目标。</p><p>当前三者统一上限1000次，并记录状态、迭代、梯度、约束与RC误差。</p></div>
       </div>
-      {figure('solver_convergence.png', '图1　代表窗口中阻尼牛顿法的目标、梯度与风险贡献误差收敛轨迹', compact=True)}
+      {figure('solver_convergence.png', '图2　代表窗口的风险贡献误差收敛轨迹', compact=True)}
       {table(['算法','成功率','中位迭代','中位耗时/ms','中位RC误差','最大RC误差'], algorithm_rows, small=True)}
-      <p>阻尼牛顿法中位仅{summary['newton_summary']['median_iterations']:.0f}次迭代，运行时间中位数为{summary['newton_summary']['median_runtime_ms']:.3f} ms；其滚动窗口最大风险贡献误差为{summary['newton_summary']['max_rc_error']:.2e}。未达到严格梯度阈值的个别窗口仍满足1×10<sup>−6</sup>风险贡献验收线，因此“成功率”与“最终可用性”需区分。</p>
+      <p>阻尼牛顿法中位仅{summary['newton_summary']['median_iterations']:.0f}次迭代，运行时间中位数为{summary['newton_summary']['median_runtime_ms']:.3f} ms，滚动最大RC误差为{summary['newton_summary']['max_rc_error']:.2e}。历史v0.05虽已采用凸模型，但未显式收紧梯度阈值，也没有独立RC验收；当前实现补足了“模型正确但停止过早”的诊断缺口。</p>
     """))
 
-    pages.append(page(5, "4　算法效率与病态矩阵压力测试", f"""
+    pages.append(page(6, "5　算法效率与病态矩阵压力测试", f"""
       <div class="two-col">
-        {figure('solver_summary.png', '图2　全部滚动月度协方差矩阵上的求解效率与精度', compact=True)}
-        {figure('stress_test.png', '图3　条件数10²至10⁸下的求解稳定性（每档20次）', compact=True)}
+        {figure('solver_summary.png', '图3　当前三类求解器的效率与精度', compact=True)}
+        {figure('stress_test.png', '图4　条件数10²至10⁸下的求解稳定性', compact=True)}
       </div>
-      <h2>4.1 滚动窗口结果</h2>
-      <p>在148个滚动月度矩阵上，L-BFGS-B成功率为{summary['lbfgsb_summary']['success_rate']:.1%}，但中位迭代与耗时分别为{summary['lbfgsb_summary']['median_iterations']:.0f}次和{summary['lbfgsb_summary']['median_runtime_ms']:.3f} ms。SLSQP中位迭代{summary['slsqp_summary']['median_iterations']:.1f}次，最大RC误差{summary['slsqp_summary']['max_rc_error']:.2e}，显示原始非凸形式对数值设置更敏感。</p>
-      <h2>4.2 压力测试</h2>
-      <p>固定随机种子42，使用随机正交基和指定特征值谱生成9维正定矩阵。条件数达到10<sup>8</sup>时，阻尼牛顿法20次成功率为{summary['stress_newton_1e8']['success_rate']:.1%}，最大RC误差为{summary['stress_newton_1e8']['max_rc_error']:.2e}，仍低于1×10<sup>−6</sup>验收阈值。压力测试说明解析Hessian与可行线搜索能显著缓解病态性，但不能替代协方差正则化。</p>
-      <div class="callout"><b>算法结论：</b>阻尼牛顿法在本问题的低维、稠密且Hessian可解析场景中最有优势；若资产维数极高，存储Hessian的代价会使L-BFGS类方法更有吸引力。</div>
-      <p class="source">资料来源：output/tables/algorithm_summary.csv 与 stress_test_summary.csv；图表由程序生成。</p>
+      <h2>5.1 滚动窗口结果</h2>
+      <p>在148个滚动月度矩阵上，L-BFGS-B成功率为{summary['lbfgsb_summary']['success_rate']:.1%}，中位迭代与耗时分别为{summary['lbfgsb_summary']['median_iterations']:.0f}次和{summary['lbfgsb_summary']['median_runtime_ms']:.3f} ms。SLSQP中位迭代{summary['slsqp_summary']['median_iterations']:.1f}次，最大RC误差{summary['slsqp_summary']['max_rc_error']:.2e}，显示原始非凸形式对数值设置更敏感。</p>
+      <h2>5.2 压力测试</h2>
+      <p>固定随机种子42，使用随机正交基和指定特征值谱生成9维正定矩阵。条件数达到10<sup>8</sup>时，阻尼牛顿法20次成功率为{summary['stress_newton_1e8']['success_rate']:.1%}，最大RC误差为{summary['stress_newton_1e8']['max_rc_error']:.2e}，仍低于1×10<sup>−6</sup>验收阈值。</p>
+      <div class="callout"><b>算法结论：</b>阻尼牛顿法适合本问题低维、稠密且Hessian可解析的结构；高维场景下，L-BFGS类方法可能因无需存储完整Hessian而更有吸引力。协方差正则化仍不可省略。</div>
+      <p class="source">资料来源：algorithm_summary.csv 与 stress_test_summary.csv；图表由程序生成。</p>
     """))
 
-    pages.append(page(6, "5　回测设计与样本外绩效", f"""
+    pages.append(page(7, "6　回测设计与样本外绩效", f"""
       <div class="method-strip"><span>过去252日</span><b>→</b><span>月末估计风险</span><b>→</b><span>下一交易日调仓</span><b>→</b><span>单边成本5 bp</span></div>
       <p>月末只使用截至当日的历史收益，目标权重在下一交易日执行，避免未来信息；月内权重随资产收益自然漂移。组合无杠杆、只做多。对比策略为等权组合、逆下行波动率组合和EWMA半协方差风险平价。</p>
-      {figure('strategy_nav.png', '图4　三类资产配置策略累计净值（2014—2026年4月）')}
+      {figure('strategy_nav.png', '图5　三类资产配置策略累计净值（2014—2026年4月）')}
       {table(['策略','年化收益','年化波动','夏普','最大回撤','卡玛','年化换手'], validation_rows, small=True)}
-      <p>验证期等权组合年化收益{validation_equal['annual_return']:.2%}高于风险平价的{validation_erc['annual_return']:.2%}，但其波动{validation_equal['annual_volatility']:.2%}和最大回撤{validation_equal['max_drawdown']:.2%}也明显更高。风险平价夏普{validation_erc['sharpe']:.2f}、卡玛{validation_erc['calmar']:.2f}，因此本文的主结论是“改善风险调整后收益”，而不是“保证最高收益”。</p>
-      <p class="source">资料来源：output/tables/strategy_nav.csv 与 strategy_metrics.csv；净值和指标由程序重算。</p>
+      <p>验证期等权组合年化收益{validation_equal['annual_return']:.2%}高于风险平价的{validation_erc['annual_return']:.2%}，但其波动{validation_equal['annual_volatility']:.2%}和最大回撤{validation_equal['max_drawdown']:.2%}也明显更高。风险平价夏普{validation_erc['sharpe']:.2f}、卡玛{validation_erc['calmar']:.2f}，因此主结论是“改善风险调整后收益”，而不是“保证最高收益”。</p>
+      <p class="source">资料来源：strategy_nav.csv 与 strategy_metrics.csv；净值和指标由程序重算。</p>
     """))
 
-    pages.append(page(7, "6　风险估计口径与年度情景", f"""
+    pages.append(page(8, "7　风险估计口径与年度情景", f"""
       <div class="two-col">
-        {figure('estimator_comparison.png', '图5　三类协方差估计下的样本外风险收益', compact=True)}
-        {figure('yearly_returns.png', '图6　三类配置策略的年度收益情景', compact=True)}
+        {figure('estimator_comparison.png', '图6　三类协方差估计下的样本外风险收益', compact=True)}
+        {figure('yearly_returns.png', '图7　三类配置策略的年度收益情景', compact=True)}
       </div>
       {table(['风险估计','年化收益','年化波动','夏普','最大回撤','年化换手'], estimator_rows, small=True)}
-      <h2>6.1 半协方差并非样本外最优</h2>
-      <p>样本协方差、EWMA全协方差和EWMA半协方差均使用相同窗口、调仓、成本和凸求解器。验证期中，EWMA全协方差夏普{summary['estimator_validation']['ewma_full']['sharpe']:.2f}，高于半协方差的{summary['estimator_validation']['ewma_semi']['sharpe']:.2f}；样本协方差回撤也更浅。这一结果没有否定半协方差，而是说明“只强调下行方向”会改变相关结构与换手，并不必然提升样本外绩效。</p>
-      <h2>6.2 情景解释</h2>
-      <p>年度收益图显示策略相对表现会随股债商品环境变化。风险平价的结构性作用是抑制单一高波动资产主导，而不是消除宏观共同冲击。2026年数据只覆盖至4月3日，不应与完整年度直接比较。</p>
-      <div class="callout"><b>审慎结论：</b>风险估计口径是一项模型假设，应通过多估计器对照、参数敏感性和更长样本检验，而不能根据单一样本外指标宣布一种估计器永久占优。</div>
+      <h2>7.1 半协方差并非样本外最优</h2>
+      <p>三类风险估计使用相同窗口、调仓、成本和凸求解器。验证期EWMA全协方差夏普{summary['estimator_validation']['ewma_full']['sharpe']:.2f}，高于半协方差的{summary['estimator_validation']['ewma_semi']['sharpe']:.2f}；样本协方差回撤也更浅。强调下行方向会改变相关结构与换手，并不必然提升样本外绩效。</p>
+      <h2>7.2 情景解释</h2>
+      <p>年度收益图显示策略相对表现会随股债商品环境变化。风险平价抑制单一高波动资产主导，但不能消除宏观共同冲击。2026年数据只覆盖至4月3日，不与完整年度直接比较。</p>
+      <div class="callout"><b>审慎结论：</b>风险估计口径是一项模型假设，应通过多估计器对照、参数敏感性和更长样本检验。</div>
     """))
 
-    pages.append(page(8, "7　参数敏感性与训练期选参", f"""
+    pages.append(page(9, "8　参数敏感性与训练期选参", f"""
       <p>对窗口{{126,252,504}}和衰减系数{{0.90,0.94,0.97,0.99}}运行12组半协方差风险平价回测。先按2014—2020年训练期夏普从高到低排序，若相同则选择最大回撤较小者；验证期不参与选择。</p>
-      {figure('sensitivity_heatmap.png', '图7　窗口与衰减系数的训练期、验证期夏普热力图', compact=True)}
+      {figure('sensitivity_heatmap.png', '图8　窗口与衰减系数的训练期、验证期夏普热力图', compact=True)}
       {table(['窗口/日','衰减','验证期收益','验证期夏普','验证期回撤'], sensitivity_rows, small=True)}
-      <p>训练期规则锁定窗口{selected['window']}日、衰减{selected['decay']:.2f}，训练期夏普{selected['train_sharpe']:.2f}，样本外夏普{selected['validation_sharpe']:.2f}。默认主模型252日、0.97的样本外夏普为{validation_erc['sharpe']:.2f}，两者接近，说明主结论不依赖单个参数点；但不同参数的换手率差异仍会影响落地成本。</p>
-      <p class="source">资料来源：output/tables/parameter_sensitivity.csv；固定随机种子与同一交易成本设置。</p>
+      <p>训练期规则锁定窗口{selected['window']}日、衰减{selected['decay']:.2f}，训练期夏普{selected['train_sharpe']:.2f}，样本外夏普{selected['validation_sharpe']:.2f}。默认主模型252日、0.97的样本外夏普为{validation_erc['sharpe']:.2f}，两者接近；但不同参数的换手率差异仍会影响落地成本。</p>
+      <p class="source">资料来源：parameter_sensitivity.csv；固定随机种子与同一交易成本设置。</p>
     """))
 
-    pages.append(page(9, "8　代表窗口的最优权重与风险贡献", f"""
-      {figure('weights_risk_contributions.png', '图8　2025-12-31代表窗口的资产权重与相对风险贡献')}
+    pages.append(page(10, "9　代表窗口的最优权重与风险贡献", f"""
+      {figure('weights_risk_contributions.png', '图9　2025-12-31代表窗口的资产权重与相对风险贡献')}
       <div class="two-col weights-layout">
         <div>{table(['资产','权重','风险贡献','目标'], optimum_rows, small=True)}</div>
-        <div><h2>8.1 为什么债券权重大</h2><p>风险预算约束的是方差贡献，而非名义资金。低波动债券需要更高权重，才能达到与股票、黄金和商品相同的边际风险贡献。因此，“债券权重大”与“九类资产风险贡献均约11.11%”并不矛盾。</p><h2>8.2 最优解诊断</h2><p>代表窗口全部权重严格为正、权重和为1。每类资产风险贡献与目标11.11%的偏差处于数值容差内。滚动回测中风险平价平均最大权重为{validation_erc['average_max_weight']:.2%}，说明风险均衡不等同于资本均衡，必要时可进一步加入权重上限。</p></div>
+        <div><h2>9.1 为什么债券权重大</h2><p>风险预算约束的是方差贡献，而非名义资金。低波动债券需要更高权重，才能达到与股票、黄金和商品相同的边际风险贡献。因此，“债券权重大”与“九类资产风险贡献均约11.11%”并不矛盾。</p><h2>9.2 最优解诊断</h2><p>代表窗口全部权重严格为正、权重和为1。每类资产风险贡献与目标的偏差处于数值容差内。滚动回测中风险平价平均最大权重为{validation_erc['average_max_weight']:.2%}，必要时可进一步加入权重上限。</p></div>
       </div>
-      <p class="source">资料来源：output/tables/representative_optimal_solution.csv；协方差窗口截至2025-12-31。</p>
+      <p class="source">资料来源：representative_optimal_solution.csv；协方差窗口截至2025-12-31。</p>
     """))
 
-    pages.append(page(10, "9　结论、局限与启示", f"""
-      <h2>9.1 主要结论</h2>
-      <ol class="conclusions"><li><b>模型：</b>对数障碍凸重构将等风险贡献转化为严格凸问题，加入10<sup>−8</sup>I后最优解唯一，KKT条件直接给出风险预算等式。</li><li><b>算法：</b>自实现阻尼牛顿法利用解析Hessian、正权重步长上界和Armijo线搜索，在滚动窗口中以{summary['newton_summary']['median_iterations']:.0f}次中位迭代达到高精度，并通过条件数10<sup>8</sup>压力测试。</li><li><b>实证：</b>风险平价验证期年化收益{validation_erc['annual_return']:.2%}、波动{validation_erc['annual_volatility']:.2%}、夏普{validation_erc['sharpe']:.2f}、最大回撤{validation_erc['max_drawdown']:.2%}。相对等权组合，优势主要是降低波动和回撤。</li><li><b>稳健性：</b>参数网格结果较平滑，但协方差估计对结论影响显著，EWMA半协方差在该样本外并非最优估计器。</li></ol>
-      <h2>9.2 局限与下一步</h2>
-      <p>ETF成立前指数代理、固定交易成本、零无风险利率、2026年不完整年度和有限参数网格限制外推。后续可加入Ledoit–Wolf收缩、权重上限、换手惩罚与滚动交叉验证，并考察股债相关性上升时的稳健性。</p>
-      <h2>9.3 复现说明</h2>
-      <p>在项目目录执行 <code>python run.py</code> 即可重新清洗数据、运行全部实验、生成8张图和本PDF；执行 <code>python -m unittest discover -s tests -v</code> 运行梯度/Hessian、闭式解、三算法一致性、无未来数据和交易成本测试。所有配置集中于 <code>config.json</code>。</p>
+    pages.append(page(11, "10　动态可行域、一般风险预算与波动率约束", f"""
+      <h2>10.1 后期版本的优化建模边界</h2>
+      <p><b>v0.15：</b>按照资产上市状态改变进入优化器的资产集合，可视为随时间变化的可行资产域。<b>v0.16_2：</b>将b<sub>i</sub>=1/n推广为信号条件化预算向量，信号改变目标风险贡献而不直接指定资金仓位。<b>v0.16_3：</b>先用近60日实现波动率缩放股指资金仓位，再优化剩余资产；这是优化器外部的风险覆盖，不是凸目标本身的升级。</p>
+      {figure('risk_budget_extension.png', '图10　一般风险预算的目标贡献、实际贡献与资金权重', compact=True)}
+      {table(['资产','预算倍率','目标风险','实际风险','资金权重'], risk_budget_rows, small=True)}
+      <div class="callout"><b>代表实验：</b>沪深300ETF与中证1000ETF的原始风险预算倍率设为2，其余资产为1；归一化后两类目标分别为18.18%和9.09%。阻尼牛顿法最大预算跟踪误差为{risk_budget_summary['rc_max_error']:.2e}。该结果只验证一般风险预算可实现，不宣称倾斜预算提高收益。</div>
+      <p class="source">资料来源：v0.15、v0.16_2、v0.16_3历史代码；risk_budget_extension.csv。</p>
+    """))
+
+    pages.append(page(12, "11　结论、局限与启示", f"""
+      <h2>11.1 主要结论</h2>
+      <ol class="conclusions"><li><b>演进：</b>目标放大与相对误差缓解尺度敏感，但凸重构和独立RC验收才带来结构性可靠性。</li><li><b>模型：</b>对数障碍模型严格凸，加入10<sup>−8</sup>I后最优解唯一，KKT条件直接给出一般风险预算等式。</li><li><b>算法：</b>阻尼牛顿法利用解析Hessian、正权重步长与Armijo线搜索，以{summary['newton_summary']['median_iterations']:.0f}次中位迭代达到高精度，并通过条件数10<sup>8</sup>压力测试。</li><li><b>实证：</b>风险平价验证期年化收益{validation_erc['annual_return']:.2%}、波动{validation_erc['annual_volatility']:.2%}、夏普{validation_erc['sharpe']:.2f}、最大回撤{validation_erc['max_drawdown']:.2%}；优势主要是降低波动和回撤。</li><li><b>扩展：</b>动态可行域、一般风险预算和外部波动覆盖分属不同建模层级，应避免混称为优化器升级。</li></ol>
+      <h2>11.2 局限与复现</h2>
+      <p>ETF成立前指数代理、固定成本、零无风险利率、2026年不完整年度和有限参数网格限制外推。后续可加入协方差收缩、权重上限、换手惩罚与滚动交叉验证。在项目目录执行 <code>python run.py</code> 可重建数据、实验、10张图、HTML与本PDF；测试覆盖目标函数性质、闭式解、求解器一致性、无前视和交易成本。</p>
       <h2>参考文献</h2>
-      <ol class="references"><li>Maillard, S., Roncalli, T., &amp; Teïletche, J. (2010). On the Properties of Equally-Weighted Risk Contributions Portfolios. <i>Journal of Portfolio Management</i>.</li><li>Spinu, F. (2013). An Algorithm for Computing Risk Parity Weights.</li><li>Nocedal, J., &amp; Wright, S. (2006). <i>Numerical Optimization</i> (2nd ed.). Springer.</li><li>华泰研究（2025）：《从资产配置走向因子配置：中国版全天候增强策略》。</li><li>本项目历史版本：资产风险平价策略v0.01（SLSQP）与v0.05（凸优化）。</li></ol>
-      <div class="final-note">报告、图表、结果表与测试均由本仓库代码重新生成；研报仅用于研究背景和方法引用。</div>
+      <ol class="references"><li>Maillard, S., Roncalli, T., &amp; Teïletche, J. (2010). On the Properties of Equally-Weighted Risk Contributions Portfolios. <i>Journal of Portfolio Management</i>.</li><li>Spinu, F. (2013). An Algorithm for Computing Risk Parity Weights.</li><li>Nocedal, J., &amp; Wright, S. (2006). <i>Numerical Optimization</i> (2nd ed.). Springer.</li><li>华泰研究（2025）：《从资产配置走向因子配置：中国版全天候增强策略》。</li><li>本项目历史版本：v0.01—v0.06、v0.15、v0.16_2、v0.16_3及本课程受控复现实验。</li></ol>
+      <div class="final-note">报告、图表、结果表与测试均由本仓库代码重新生成；历史绩效仅作开发背景，优化器结论来自统一口径实验。</div>
     """))
 
     css = """
@@ -1021,7 +1221,7 @@ def _verify_pdf(pdf_path: Path, html_path: Path, preview_dir: Path) -> dict[str,
     reader = PdfReader(str(pdf_path))
     page_count = len(reader.pages)
     extracted = "\n".join((page.extract_text() or "") for page in reader.pages)
-    required_terms = ["EWMA", "阻尼牛顿法", "风险平价", "参考文献"]
+    required_terms = ["EWMA", "阻尼牛顿法", "风险平价", "优化器演进", "目标放大", "一般风险预算", "参考文献"]
     source_html = html_path.read_text(encoding="utf-8")
     # Chrome may map CJK glyphs to Unicode radical forms during PDF extraction;
     # verify semantic terms against the exact print source and text selectability
@@ -1052,8 +1252,8 @@ def _verify_pdf(pdf_path: Path, html_path: Path, preview_dir: Path) -> dict[str,
         "forbidden_terms_found": leaked_terms,
         "rendered_pages": [str(path) for path in page_paths],
         "contact_sheet": str(contact_sheet),
-        "expected_page_range": "8-12",
-        "status": "passed" if 8 <= page_count <= 12 and len(extracted) > 3000 and not missing_terms and not leaked_terms else "needs_revision",
+        "expected_page_count": 12,
+        "status": "passed" if page_count == 12 and len(extracted) > 3000 and not missing_terms and not leaked_terms else "needs_revision",
     }
     if verification["status"] != "passed":
         raise RuntimeError(f"PDF verification failed: {verification}")

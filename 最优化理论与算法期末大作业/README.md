@@ -6,7 +6,7 @@
 
 - `output/pdf/最优化理论与算法期末大作业_风险平价.pdf`：课程提交版 PDF。
 - `output/html/report.html`：自包含、可审计的交互式技术报告。
-- `output/html/print_report.html`：与 10 页提交版 PDF 对应的 A4 打印源文件。
+- `output/html/print_report.html`：与 12 页提交版 PDF 对应的 A4 打印源文件。
 - `output/tables/`：数据质量、算法、回测、稳健性与敏感性结果。
 - `output/figures/`：由实验程序生成的静态图表。
 - `src/`：模型、回测、实验和报告构建代码。
@@ -38,8 +38,10 @@ python -m venv --system-site-packages .venv
 .\.venv\Scripts\python.exe -m unittest discover -s .\最优化理论与算法期末大作业\tests -v
 ```
 
-构建过程会依次执行数据清洗、数据质量检查、三类求解器比较、病态矩阵压力测试、
-三策略回测、风险估计方法对比、参数敏感性实验、静态图表生成、技术报告 HTML 构建和 PDF 导出。
+构建过程会依次执行数据清洗、数据质量检查、历史优化器受控复现、三类当前求解器比较、
+一般风险预算演示、病态矩阵压力测试、三策略回测、风险估计方法对比、参数敏感性实验、
+静态图表生成、技术报告 HTML 构建和 PDF 导出。历史脚本保持只读，优化器演进实验在相同的
+148 个滚动风险矩阵上统一比较目标函数、停止设置和风险贡献误差验收。
 
 ## 固定实验口径
 
