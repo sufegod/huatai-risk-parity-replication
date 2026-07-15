@@ -16,6 +16,8 @@ import pandas as pd
 from PIL import Image, ImageDraw
 from pypdf import PdfReader
 
+from .word_report import build_word_and_pdf
+
 
 TITLE = "基于 EWMA 半协方差的风险平价资产配置优化——凸重构、阻尼牛顿法与实证分析"
 
@@ -47,7 +49,7 @@ def _fmt(value: float, digits: int = 2) -> str:
     return f"{value:.{digits}f}"
 
 
-def _artifact_payload(course_dir: Path, config: dict[str, Any], summary: dict[str, Any]) -> dict[str, Any]:
+def _artifact_payload_legacy(course_dir: Path, config: dict[str, Any], summary: dict[str, Any]) -> dict[str, Any]:
     queries = {
         "headline_query": """
 SELECT annual_return, sharpe, max_drawdown
@@ -763,6 +765,515 @@ UNION ALL SELECT '清洗后缺失单元格', (SELECT count(*) FROM long_clean WH
     }
 
 
+def _artifact_payload(course_dir: Path, config: dict[str, Any], summary: dict[str, Any]) -> dict[str, Any]:
+    """Build the compact audit HTML that mirrors the submission report."""
+
+    queries = {
+        "headline_query": """
+SELECT annual_return, sharpe, max_drawdown
+FROM read_csv_auto('output/tables/strategy_metrics.csv', header=true)
+WHERE strategy='erc' AND period='validation'
+""".strip(),
+        "nav_query": """
+WITH long_data AS (
+  UNPIVOT (SELECT * FROM read_csv_auto('output/tables/strategy_nav.csv', header=true))
+  ON equal_weight, inverse_downside_vol, erc
+  INTO NAME strategy VALUE nav
+), ranked AS (
+  SELECT CAST(date AS DATE) AS date, strategy, nav,
+         row_number() OVER (
+           PARTITION BY date_trunc('month', CAST(date AS DATE)), strategy
+           ORDER BY CAST(date AS DATE) DESC
+         ) AS rn
+  FROM long_data
+)
+SELECT strftime(date, '%Y-%m-%d') AS date,
+       CASE strategy
+         WHEN 'equal_weight' THEN '等权组合'
+         WHEN 'inverse_downside_vol' THEN '逆下行波动率'
+         ELSE '风险平价'
+       END AS strategy,
+       nav
+FROM ranked WHERE rn=1 ORDER BY date, strategy
+""".strip(),
+        "performance_query": """
+SELECT CASE strategy
+         WHEN 'equal_weight' THEN '等权组合'
+         WHEN 'inverse_downside_vol' THEN '逆下行波动率'
+         ELSE '风险平价'
+       END AS strategy,
+       CASE period WHEN 'train' THEN '训练期' ELSE '验证期' END AS period,
+       annual_return, annual_volatility, sharpe, max_drawdown, calmar, annual_turnover
+FROM read_csv_auto('output/tables/strategy_metrics.csv', header=true)
+WHERE period IN ('train', 'validation')
+ORDER BY period, strategy
+""".strip(),
+        "algorithm_query": """
+SELECT *, CASE method
+         WHEN 'newton' THEN '阻尼牛顿法'
+         WHEN 'lbfgsb' THEN 'L-BFGS-B'
+         ELSE 'SLSQP'
+       END AS algorithm
+FROM read_csv_auto('output/tables/algorithm_summary.csv', header=true)
+ORDER BY method
+""".strip(),
+        "stress_query": """
+SELECT *, CASE method
+         WHEN 'newton' THEN '阻尼牛顿法'
+         WHEN 'lbfgsb' THEN 'L-BFGS-B'
+         ELSE 'SLSQP'
+       END AS algorithm
+FROM read_csv_auto('output/tables/stress_test_summary.csv', header=true)
+WHERE condition_number=(SELECT max(condition_number)
+                        FROM read_csv_auto('output/tables/stress_test_summary.csv', header=true))
+ORDER BY method
+""".strip(),
+        "risk_budget_query": """
+SELECT asset, raw_budget_multiplier, target_risk_budget,
+       actual_risk_contribution, weight, absolute_rc_error,
+       CAST(representative_date AS DATE) AS representative_date
+FROM read_csv_auto('output/tables/risk_budget_extension.csv', header=true)
+ORDER BY asset
+""".strip(),
+        "risk_budget_chart_query": """
+SELECT asset,
+       CASE measure WHEN 'target_risk_budget' THEN '目标风险预算' ELSE '实际风险贡献' END AS measure,
+       value
+FROM (
+  UNPIVOT (
+    SELECT asset, target_risk_budget, actual_risk_contribution
+    FROM read_csv_auto('output/tables/risk_budget_extension.csv', header=true)
+  ) ON target_risk_budget, actual_risk_contribution INTO NAME measure VALUE value
+)
+ORDER BY asset, measure
+""".strip(),
+        "sensitivity_query": """
+SELECT *, CAST(CAST("window" AS INTEGER) AS VARCHAR) AS window_label,
+       printf('%.2f', decay) AS decay_label
+FROM read_csv_auto('output/tables/parameter_sensitivity.csv', header=true)
+WHERE period='validation'
+ORDER BY decay, "window"
+""".strip(),
+        "optimal_query": """
+SELECT asset,
+       CASE measure WHEN 'weight' THEN '组合权重' ELSE '风险贡献' END AS measure,
+       value
+FROM (
+  UNPIVOT (
+    SELECT asset, weight, risk_contribution
+    FROM read_csv_auto('output/tables/representative_optimal_solution.csv', header=true)
+  ) ON weight, risk_contribution INTO NAME measure VALUE value
+)
+ORDER BY asset, measure
+""".strip(),
+        "quality_query": """
+WITH clean AS (
+  SELECT * FROM read_csv_auto('data/etf_returns.csv', header=true)
+), long_clean AS (
+  UNPIVOT clean ON COLUMNS(* EXCLUDE (date)) INTO NAME asset VALUE daily_return
+), profile AS (
+  SELECT * FROM read_csv_auto('output/tables/data_quality_profile.csv', header=true)
+)
+SELECT '数据行数' AS check, (SELECT count(*) FROM clean) AS value, '通过' AS result
+UNION ALL SELECT '资产数量', (SELECT count(DISTINCT asset) FROM long_clean), '通过'
+UNION ALL SELECT '重复日期', (SELECT count(*)-count(DISTINCT date) FROM clean), '通过'
+UNION ALL SELECT '清洗前缺失单元格', (SELECT sum(missing_before_fill) FROM profile), '已按0收益处理'
+UNION ALL SELECT '清洗后缺失单元格', (SELECT count(*) FROM long_clean WHERE daily_return IS NULL), '通过'
+""".strip(),
+    }
+
+    original_cwd = Path.cwd()
+    try:
+        os.chdir(course_dir)
+        connection = duckdb.connect()
+        frames = {name: connection.execute(sql).fetchdf() for name, sql in queries.items()}
+        connection.close()
+    finally:
+        os.chdir(original_cwd)
+
+    query_file = course_dir / "output" / "html" / "report_queries.sql"
+    query_file.write_text(
+        "\n\n".join(f"-- {name}\n{sql};" for name, sql in queries.items()) + "\n",
+        encoding="utf-8",
+    )
+
+    validation_erc = summary["validation_erc"]
+    validation_equal = summary["validation_equal_weight"]
+    selected = summary["selected_parameter"]
+    data_quality = summary["data_quality"]
+    risk_budget_summary = summary["risk_budget_extension"]
+    sources = [
+        {
+            "id": "etf_data",
+            "label": "ETF风险平价回测数据",
+            "path": "data/etf_returns.csv",
+            "description": "项目原始工作簿清洗后的9资产日收益。",
+        },
+        {
+            "id": "derived_results",
+            "label": "课程实验派生结果",
+            "path": "output/tables/analysis_summary.json",
+            "description": "算法比较、回测、参数敏感性和一般风险预算的统一结果源。",
+        },
+        {
+            "id": "drive_maillard",
+            "label": "Maillard等：ERC组合性质",
+            "path": "https://drive.google.com/file/d/1LyBLViiBNZ33qpD4v9ISxPoEEbXIiaqM",
+            "description": "用于第一章ERC性质和风险分散解释。",
+        },
+        {
+            "id": "drive_tasche",
+            "label": "Tasche：Euler风险分解",
+            "path": "https://drive.google.com/file/d/1mUogSsw65HAWz-KJleKfw5f_si7P3TvW",
+            "description": "用于第一章风险贡献的完整分配和经济含义。",
+        },
+        {
+            "id": "drive_bruder",
+            "label": "Bruder与Roncalli：一般风险预算",
+            "path": "https://drive.google.com/file/d/1XY44_u6KNNm9v0LpT7KI5nYFG0CDm-DC",
+            "description": "用于第一章一般风险预算框架。",
+        },
+        {
+            "id": "drive_cetingoz",
+            "label": "Cetingoz等：存在性、唯一性与计算",
+            "path": "https://drive.google.com/file/d/1IN4XFGEl_VPz55FZ1HGoLGYnoqjXzhyW",
+            "description": "用于第一章凸优化计算的理论脉络。",
+        },
+    ]
+    query_descriptions = {
+        "headline_query": "抽取风险平价验证期核心指标。",
+        "nav_query": "将日净值转换为月末长表。",
+        "performance_query": "抽取训练期和验证期策略绩效。",
+        "algorithm_query": "抽取滚动矩阵上的算法效率与精度。",
+        "stress_query": "抽取最大条件数下的压力测试结果。",
+        "risk_budget_query": "抽取一般风险预算代表解。",
+        "risk_budget_chart_query": "转换目标预算和实际贡献为长表。",
+        "sensitivity_query": "抽取验证期参数敏感性结果。",
+        "optimal_query": "转换代表窗口权重和风险贡献为长表。",
+        "quality_query": "复算行数、资产数、重复与缺失。",
+    }
+    for source_id, sql in queries.items():
+        sources.append({
+            "id": source_id,
+            "label": query_descriptions[source_id],
+            "path": "output/html/report_queries.sql",
+            "query": {
+                "engine": "duckdb",
+                "language": "sql",
+                "sql": sql,
+                "description": query_descriptions[source_id],
+                "tables_used": ["output/tables/*.csv", "data/etf_returns.csv"],
+                "executed_at": "2026-07-15T12:00:00+08:00",
+            },
+        })
+
+    cards = [
+        {
+            "id": "validation_return",
+            "dataset": "headline_metrics",
+            "sourceId": "headline_query",
+            "description": "风险平价组合验证期年化收益。",
+            "metrics": [{"label": "验证期年化收益", "field": "annual_return", "format": "percent"}],
+        },
+        {
+            "id": "validation_sharpe",
+            "dataset": "headline_metrics",
+            "sourceId": "headline_query",
+            "description": "无风险利率为0的年化夏普比率。",
+            "metrics": [{"label": "验证期夏普比率", "field": "sharpe", "format": "number"}],
+        },
+        {
+            "id": "validation_drawdown",
+            "dataset": "headline_metrics",
+            "sourceId": "headline_query",
+            "description": "验证期累计净值的最大回撤。",
+            "metrics": [{"label": "验证期最大回撤", "field": "max_drawdown", "format": "percent"}],
+        },
+    ]
+    charts = [
+        {
+            "id": "algorithm_chart",
+            "title": "三类求解算法的中位迭代次数",
+            "description": "148个滚动月末EWMA半协方差矩阵。",
+            "type": "bar",
+            "dataset": "algorithm_summary",
+            "sourceId": "algorithm_query",
+            "encodings": {
+                "x": {"field": "algorithm", "type": "nominal"},
+                "y": {"field": "median_iterations", "type": "quantitative"},
+            },
+        },
+        {
+            "id": "nav_chart",
+            "title": "三类资产配置策略累计净值",
+            "description": "月末观察、下一交易日调仓，含单边5bp成本。",
+            "type": "line",
+            "dataset": "nav_monthly",
+            "sourceId": "nav_query",
+            "encodings": {
+                "x": {"field": "date", "type": "temporal"},
+                "y": {"field": "nav", "type": "quantitative"},
+                "color": {"field": "strategy", "type": "nominal"},
+            },
+        },
+        {
+            "id": "optimal_chart",
+            "title": "代表窗口的组合权重与风险贡献",
+            "description": "目标风险贡献均为11.11%。",
+            "type": "bar",
+            "dataset": "optimal_solution",
+            "sourceId": "optimal_query",
+            "encodings": {
+                "x": {"field": "asset", "type": "nominal"},
+                "y": {"field": "value", "type": "quantitative"},
+                "color": {"field": "measure", "type": "nominal"},
+            },
+        },
+        {
+            "id": "sensitivity_chart",
+            "title": "参数组合的样本外夏普比率",
+            "description": "参数只用训练期选择，验证期用于检查。",
+            "type": "heatmap",
+            "dataset": "sensitivity_validation",
+            "sourceId": "sensitivity_query",
+            "encodings": {
+                "x": {"field": "window_label", "type": "nominal"},
+                "y": {"field": "decay_label", "type": "nominal"},
+                "color": {"field": "sharpe", "type": "quantitative"},
+            },
+        },
+        {
+            "id": "risk_budget_chart",
+            "title": "一般风险预算的目标与实际贡献",
+            "description": "两只宽基股票ETF预算倍率为2，其余资产为1。",
+            "type": "bar",
+            "dataset": "risk_budget_long",
+            "sourceId": "risk_budget_chart_query",
+            "encodings": {
+                "x": {"field": "asset", "type": "nominal"},
+                "y": {"field": "value", "type": "quantitative"},
+                "color": {"field": "measure", "type": "nominal"},
+            },
+        },
+    ]
+    tables = [
+        {
+            "id": "quality_table",
+            "title": "数据质量检查摘要",
+            "description": f"原始数据覆盖{data_quality['start_date']}至{data_quality['end_date']}。",
+            "dataset": "data_quality",
+            "sourceId": "quality_query",
+            "columns": [
+                {"field": "check", "label": "检查项"},
+                {"field": "value", "label": "数值", "format": "number"},
+                {"field": "result", "label": "结论"},
+            ],
+        },
+        {
+            "id": "algorithm_table",
+            "title": "滚动矩阵算法精度与效率",
+            "description": "最终结果统一按RC误差和权重约束验收。",
+            "dataset": "algorithm_summary",
+            "sourceId": "algorithm_query",
+            "columns": [
+                {"field": "algorithm", "label": "算法"},
+                {"field": "success_rate", "label": "成功率", "format": "percent"},
+                {"field": "median_iterations", "label": "中位迭代", "format": "number"},
+                {"field": "median_rc_error", "label": "中位RC误差", "format": "number"},
+                {"field": "max_rc_error", "label": "最大RC误差", "format": "number"},
+            ],
+        },
+        {
+            "id": "stress_table",
+            "title": "条件数10⁸下的压力测试",
+            "description": "9维随机正定矩阵，每种算法固定种子重复20次。",
+            "dataset": "stress_view",
+            "sourceId": "stress_query",
+            "columns": [
+                {"field": "algorithm", "label": "算法"},
+                {"field": "success_rate", "label": "成功率", "format": "percent"},
+                {"field": "median_iterations", "label": "中位迭代", "format": "number"},
+                {"field": "max_rc_error", "label": "最大RC误差", "format": "number"},
+            ],
+        },
+        {
+            "id": "performance_table",
+            "title": "训练期与验证期绩效",
+            "description": "收益和风险按252个交易日年化。",
+            "dataset": "performance",
+            "sourceId": "performance_query",
+            "columns": [
+                {"field": "strategy", "label": "策略"},
+                {"field": "period", "label": "区间"},
+                {"field": "annual_return", "label": "年化收益", "format": "percent"},
+                {"field": "annual_volatility", "label": "年化波动", "format": "percent"},
+                {"field": "sharpe", "label": "夏普", "format": "number"},
+                {"field": "max_drawdown", "label": "最大回撤", "format": "percent"},
+                {"field": "annual_turnover", "label": "年化换手", "format": "percent"},
+            ],
+        },
+        {
+            "id": "risk_budget_table",
+            "title": "一般风险预算代表解",
+            "description": "验证预算可实现性，不宣称收益提升。",
+            "dataset": "risk_budget",
+            "sourceId": "risk_budget_query",
+            "columns": [
+                {"field": "asset", "label": "资产"},
+                {"field": "raw_budget_multiplier", "label": "预算倍率", "format": "number"},
+                {"field": "target_risk_budget", "label": "目标预算", "format": "percent"},
+                {"field": "actual_risk_contribution", "label": "实际RC", "format": "percent"},
+                {"field": "weight", "label": "资金权重", "format": "percent"},
+            ],
+        },
+    ]
+
+    blocks = [
+        {
+            "id": "title",
+            "type": "markdown",
+            "body": (
+                f"# {config.get('title', TITLE)}\n\n"
+                f"**课程：** {config.get('course', '最优化理论与算法')}  \n"
+                f"**姓名：** {config.get('student_name', '请填写')}　　**学号：** {config.get('student_id', '请填写')}  \n"
+                f"**数据区间：** {data_quality['start_date']} 至 {data_quality['end_date']}"
+            ),
+        },
+        {
+            "id": "summary",
+            "type": "markdown",
+            "sourceId": "derived_results",
+            "body": (
+                "## 摘要\n\n"
+                "本文将ERC风险预算方程重构为正权重域上的严格凸问题，推导梯度、Hessian与KKT条件，并以正权重步长和"
+                "Armijo回溯实现阻尼牛顿法。"
+                f"148个滚动矩阵上，Newton中位迭代{_fmt(summary['newton_summary']['median_iterations'], 0)}次，"
+                f"中位RC误差{summary['newton_summary']['median_rc_error']:.2e}。验证期ERC年化收益"
+                f"{_pct(validation_erc['annual_return'])}、波动{_pct(validation_erc['annual_volatility'])}、"
+                f"夏普{_fmt(validation_erc['sharpe'])}、最大回撤{_pct(validation_erc['max_drawdown'])}。"
+            ),
+        },
+        {"id": "headline_metrics", "type": "metric-strip", "cardIds": ["validation_return", "validation_sharpe", "validation_drawdown"]},
+        {
+            "id": "literature",
+            "type": "markdown",
+            "body": (
+                "## 第一章：研究背景与相关研究\n\n"
+                "Markowitz框架对输入估计较敏感，风险预算则把决策视角从资本权重转向风险贡献。Tasche以Euler定理说明"
+                "风险贡献可以完整加总；Maillard等给出ERC介于最小方差和等权组合之间的解释；Bruder与Roncalli推广到"
+                "一般风险预算；Cetingoz等讨论其存在性、唯一性和凸优化计算。本文据此研究凸重构、阻尼牛顿求解和样本外应用。"
+            ),
+        },
+        {"id": "quality_table_block", "type": "table", "tableId": "quality_table"},
+        {
+            "id": "model",
+            "type": "markdown",
+            "body": (
+                "## ERC模型与凸等价重构\n\n"
+                "组合风险贡献为RCᵢ=wᵢ(Σw)ᵢ/(wᵀΣw)。直接RC残差目标存在尺度敏感性。改求"
+                "minₓ ½xᵀΣx-∑ᵢbᵢln(xᵢ)，x>0，其梯度为Σx-b/x，Hessian为Σ+diag(b/x²)。"
+                "正定Hessian保证唯一解，一阶条件给出xᵢ(Σx)ᵢ=bᵢ，归一化后即满足目标风险预算。"
+            ),
+        },
+        {
+            "id": "algorithm",
+            "type": "markdown",
+            "body": (
+                "## 阻尼牛顿法与数值实验\n\n"
+                "每轮通过线性方程求Newton方向，先限制步长保持x>0，再用Armijo条件保证充分下降。内部停止后重新计算"
+                "RC误差和权重约束，最大绝对RC偏差不超过1e-6才通过金融目标验收。"
+            ),
+        },
+        {"id": "algorithm_chart_block", "type": "chart", "chartId": "algorithm_chart"},
+        {"id": "algorithm_table_block", "type": "table", "tableId": "algorithm_table"},
+        {"id": "stress_table_block", "type": "table", "tableId": "stress_table"},
+        {
+            "id": "backtest",
+            "type": "markdown",
+            "body": (
+                "## 样本外实证结果\n\n"
+                f"ERC验证期夏普为{_fmt(validation_erc['sharpe'])}，等权为{_fmt(validation_equal['sharpe'])}。"
+                "其主要优势是降低波动和回撤，而不是获得最高绝对收益。"
+            ),
+        },
+        {"id": "nav_chart_block", "type": "chart", "chartId": "nav_chart"},
+        {"id": "performance_table_block", "type": "table", "tableId": "performance_table"},
+        {"id": "optimal_chart_block", "type": "chart", "chartId": "optimal_chart"},
+        {
+            "id": "sensitivity",
+            "type": "markdown",
+            "body": (
+                "## 参数敏感性\n\n"
+                f"训练期规则选中窗口{selected['window']}日、衰减系数{selected['decay']:.2f}；验证期夏普为"
+                f"{_fmt(selected['validation_sharpe'])}。主模型仍使用预设252日和0.97参数，不在验证期重新调参。"
+            ),
+        },
+        {"id": "sensitivity_chart_block", "type": "chart", "chartId": "sensitivity_chart"},
+        {
+            "id": "risk_budget",
+            "type": "markdown",
+            "body": (
+                "## 一般风险预算扩展\n\n"
+                "代表窗口中，沪深300ETF和中证1000ETF的预算倍率为2，其他资产为1。两类权益目标预算为18.18%，"
+                f"最大跟踪误差为{risk_budget_summary['rc_max_error']:.2e}。该实验仅证明模型推广能力。"
+            ),
+        },
+        {"id": "risk_budget_chart_block", "type": "chart", "chartId": "risk_budget_chart"},
+        {"id": "risk_budget_table_block", "type": "table", "tableId": "risk_budget_table"},
+        {
+            "id": "conclusion",
+            "type": "markdown",
+            "body": (
+                "## 结论与局限\n\n"
+                "凸重构提供唯一解和清晰最优性条件，阻尼牛顿法在低维稠密问题中实现高精度。样本外证据支持风险控制，"
+                "但ETF前史代理、有限风险模型、固定交易成本和特定样本区间限制外推。\n\n"
+                "## 参考文献\n\n"
+                "[1] Markowitz H. Portfolio Selection, 1952.  \n"
+                "[2] Tasche D. Capital Allocation to Business Units and Sub-Portfolios, 2008.  \n"
+                "[3] Maillard S, Roncalli T, Teïletche J. On the Properties of Equally-Weighted Risk Contributions Portfolios, 2010.  \n"
+                "[4] Bruder B, Roncalli T. Managing Risk Exposures Using the Risk Budgeting Approach, 2012.  \n"
+                "[5] Cetingoz A R, Fermanian J D, Guéant O. Risk Budgeting Portfolios: Existence and Computation, 2023.  \n"
+                "[6] Spinu F. An Algorithm for Computing Risk Parity Weights, 2013.  \n"
+                "[7] Nocedal J, Wright S J. Numerical Optimization, 2006."
+            ),
+        },
+    ]
+    manifest = {
+        "version": 1,
+        "surface": "report",
+        "title": config.get("title", TITLE),
+        "generatedAt": "2026-07-15T12:00:00+08:00",
+        "cards": cards,
+        "charts": charts,
+        "tables": tables,
+        "sources": sources,
+        "blocks": blocks,
+    }
+    datasets = {
+        "headline_metrics": _records(frames["headline_query"]),
+        "nav_monthly": _records(frames["nav_query"]),
+        "performance": _records(frames["performance_query"]),
+        "algorithm_summary": _records(frames["algorithm_query"]),
+        "stress_view": _records(frames["stress_query"]),
+        "risk_budget": _records(frames["risk_budget_query"]),
+        "risk_budget_long": _records(frames["risk_budget_chart_query"]),
+        "sensitivity_validation": _records(frames["sensitivity_query"]),
+        "optimal_solution": _records(frames["optimal_query"]),
+        "data_quality": _records(frames["quality_query"]),
+    }
+    return {
+        "surface": "report",
+        "manifest": manifest,
+        "snapshot": {
+            "version": 1,
+            "generatedAt": "2026-07-15T12:00:00+08:00",
+            "status": "ready",
+            "datasets": datasets,
+        },
+        "sources": sources,
+    }
+
+
 def _find_node() -> Path:
     found = shutil.which("node")
     if found:
@@ -1276,12 +1787,13 @@ def build_html_and_pdf(course_dir: Path, config: dict[str, Any], summary: dict[s
     _build_portable_html(artifact_path, html_path, receipt_path)
 
     print_html_path = html_dir / "print_report.html"
-    _build_print_report(course_dir, config, summary, print_html_path)
+    shutil.copyfile(html_path, print_html_path)
 
-    pdf_path = pdf_dir / "最优化理论与算法期末大作业_风险平价.pdf"
-    _print_pdf(print_html_path, pdf_path, preview_dir / "chrome-profile")
-    verification = _verify_pdf(pdf_path, print_html_path, preview_dir)
+    # The interactive HTML remains an auditable companion.  The submission PDF
+    # is generated exclusively from the editable Word report.
+    verification = build_word_and_pdf(course_dir, config, summary)
     verification["interactive_html"] = str(html_path)
+    verification["audit_print_html"] = str(print_html_path)
     verification_path = pdf_dir / "pdf_verification.json"
     verification_path.write_text(json.dumps(verification, ensure_ascii=False, indent=2), encoding="utf-8")
     return verification

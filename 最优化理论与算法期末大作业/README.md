@@ -4,9 +4,10 @@
 
 ## 交付物
 
+- `output/docx/最优化理论与算法期末大作业_风险平价.docx`：可编辑的论文式 Word 母版。
 - `output/pdf/最优化理论与算法期末大作业_风险平价.pdf`：课程提交版 PDF。
 - `output/html/report.html`：自包含、可审计的交互式技术报告。
-- `output/html/print_report.html`：与 12 页提交版 PDF 对应的 A4 打印源文件。
+- `output/html/print_report.html`：保留的 12 页 HTML 技术简报，不再作为提交版 PDF 的打印源。
 - `output/tables/`：数据质量、算法、回测、稳健性与敏感性结果。
 - `output/figures/`：由实验程序生成的静态图表。
 - `src/`：模型、回测、实验和报告构建代码。
@@ -38,10 +39,15 @@ python -m venv --system-site-packages .venv
 .\.venv\Scripts\python.exe -m unittest discover -s .\最优化理论与算法期末大作业\tests -v
 ```
 
-构建过程会依次执行数据清洗、数据质量检查、历史优化器受控复现、三类当前求解器比较、
+构建过程会依次执行数据清洗、数据质量检查、历史求解器诊断、三类当前求解器比较、
 一般风险预算演示、病态矩阵压力测试、三策略回测、风险估计方法对比、参数敏感性实验、
-静态图表生成、技术报告 HTML 构建和 PDF 导出。历史脚本保持只读，优化器演进实验在相同的
-148 个滚动风险矩阵上统一比较目标函数、停止设置和风险贡献误差验收。
+静态图表生成、技术报告 HTML 构建、论文式 Word 生成和 Microsoft Word PDF 导出。历史脚本和诊断输出保持只读，
+但不进入精简后的提交版报告与同步 HTML 正文。
+
+Word 报告采用八章精简结构，不为满足固定页数删减或扩写正文；提交版以内容完整、分页紧凑且不超过 17 页为准。正文和全部中文标题使用宋体，英文与数字使用
+Times New Roman，并保留自动目录、原生公式、自动图表题注和分节页码。
+提交版 PDF 由本机 Microsoft Word 更新全部域后通过 `ExportAsFixedFormat` 导出；LibreOffice
+只用于兼容性复核，因此其分页可以与 Word 不同。
 
 ## 固定实验口径
 

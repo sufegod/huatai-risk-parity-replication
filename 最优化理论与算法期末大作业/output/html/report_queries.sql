@@ -46,12 +46,16 @@ SELECT *, CASE method
 FROM read_csv_auto('output/tables/algorithm_summary.csv', header=true)
 ORDER BY method;
 
--- optimizer_evolution_query
-SELECT variant, label, objective_family, stage_order, observations,
-       solver_success_rate, rc_pass_rate, median_iterations,
-       median_runtime_ms, median_rc_error, max_rc_error
-FROM read_csv_auto('output/tables/optimizer_evolution_summary.csv', header=true)
-ORDER BY stage_order;
+-- stress_query
+SELECT *, CASE method
+         WHEN 'newton' THEN '阻尼牛顿法'
+         WHEN 'lbfgsb' THEN 'L-BFGS-B'
+         ELSE 'SLSQP'
+       END AS algorithm
+FROM read_csv_auto('output/tables/stress_test_summary.csv', header=true)
+WHERE condition_number=(SELECT max(condition_number)
+                        FROM read_csv_auto('output/tables/stress_test_summary.csv', header=true))
+ORDER BY method;
 
 -- risk_budget_query
 SELECT asset, raw_budget_multiplier, target_risk_budget,
@@ -62,10 +66,7 @@ ORDER BY asset;
 
 -- risk_budget_chart_query
 SELECT asset,
-       CASE measure
-         WHEN 'target_risk_budget' THEN '目标风险预算'
-         ELSE '实际风险贡献'
-       END AS measure,
+       CASE measure WHEN 'target_risk_budget' THEN '目标风险预算' ELSE '实际风险贡献' END AS measure,
        value
 FROM (
   UNPIVOT (
@@ -93,29 +94,6 @@ FROM (
   ) ON weight, risk_contribution INTO NAME measure VALUE value
 )
 ORDER BY asset, measure;
-
--- estimator_query
-SELECT *, CASE estimator
-         WHEN 'sample' THEN '样本协方差'
-         WHEN 'ewma_full' THEN 'EWMA全协方差'
-         ELSE 'EWMA半协方差'
-       END AS estimator_name
-FROM read_csv_auto('output/tables/estimator_comparison.csv', header=true)
-WHERE period='validation'
-ORDER BY estimator;
-
--- stress_query
-SELECT *, CASE method
-         WHEN 'newton' THEN '阻尼牛顿法'
-         WHEN 'lbfgsb' THEN 'L-BFGS-B'
-         ELSE 'SLSQP'
-       END AS algorithm
-FROM read_csv_auto('output/tables/stress_test_summary.csv', header=true)
-WHERE condition_number=(
-  SELECT max(condition_number)
-  FROM read_csv_auto('output/tables/stress_test_summary.csv', header=true)
-)
-ORDER BY method;
 
 -- quality_query
 WITH clean AS (

@@ -1,8 +1,9 @@
 {
   "title": "基于 EWMA 半协方差的风险平价资产配置优化——凸重构、阻尼牛顿法与实证分析",
   "course": "最优化理论与算法",
-  "student_name": "请填写",
-  "student_id": "请填写",
+  "student_name": "程哲",
+  "student_id": "2025212591",
+  "report_date": "2026年7月",
   "source_excel": "数据/原始数据/ETF风险平价回测数据.xlsx",
   "source_sheet_index": 0,
   "window": 252,

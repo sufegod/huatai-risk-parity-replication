@@ -806,6 +806,6 @@ def generate_all_outputs(config_path: Path) -> None:
     summary["chart_map"] = chart_map
     summary["config"] = config
     _json_dump(paths["tables"] / "analysis_summary.json", summary)
-    print("[8/9] 构建自包含技术报告 HTML 并导出 PDF...")
+    print("[8/9] 构建交互式 HTML、论文式 Word 并由 Microsoft Word 导出 PDF...")
     build_html_and_pdf(course_dir, config, summary)
     print("[9/9] 全部输出已生成。")
