@@ -31,7 +31,7 @@ PERFORMANCE_DIR = METRICS_DIR / '指标'
 WEIGHTS_DIR = METRICS_DIR / '仓位明细'
 CHART_DIR = BACKTEST_DIR / '回测图表'
 
-MONTH_END_FREQ = 'M'
+MONTH_END_FREQ = 'ME'
 WEEKLY_REBALANCE_FREQ = 'W-FRI'
 REBALANCE_MODE = 'daily'
 FEE_RATE = 0.0005
@@ -45,7 +45,6 @@ MARGIN_RATIOS_EXCHANGE_MIN = {
     '中证500主连': 0.08,
     '红利低波ETF': 1.00,
     '10年国债主连': 0.02,
-    '30年国债主连': 0.035,
     '沪铜主连': 0.05,
     '沪铝主连': 0.05,
     'PTA主连': 0.05,
@@ -59,7 +58,6 @@ MARGIN_RATIOS_BROKER = {
     '中证500主连': 0.14,
     '红利低波ETF': 1.00,
     '10年国债主连': 0.025,
-    '30年国债主连': 0.05,
     '沪铜主连': 0.16,
     '沪铝主连': 0.16,
     'PTA主连': 0.17,
@@ -73,7 +71,7 @@ MARGIN_RATIOS = MARGIN_RATIOS_BROKER
 
 RISK_PARITY_ASSET_CLASSES = {
     '股票': ['红利低波ETF'],
-    '债券': ['10年国债主连', '30年国债主连'],
+    '债券': ['10年国债主连'],
     '商品': ['沪铜主连', '沪铝主连', 'PTA主连', '原油主连', '豆粕主连'],
     '黄金': ['沪金主连']
 }

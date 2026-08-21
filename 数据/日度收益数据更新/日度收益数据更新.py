@@ -11,6 +11,21 @@ from typing import Any
 import pandas as pd
 
 
+def _safe_replace(tmp: Path, target: Path) -> None:
+    """os.replace with PermissionError fallback for locked files on Windows."""
+    try:
+        os.replace(tmp, target)
+    except PermissionError:
+        print(f"警告: 无法替换 {target.name}（文件被其他程序打开），正在直接覆盖写入...")
+        # 直接写入目标文件
+        import shutil
+        shutil.copy2(tmp, target)
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+
+
 PACKAGE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = PACKAGE_DIR.parents[1]
 SCRIPT_DIR = PROJECT_ROOT / "数据" / "日度收益数据更新"
@@ -328,7 +343,7 @@ def write_cache_csv(
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f"{path.name}.tmp")
     out.to_csv(tmp, index=False, encoding="utf-8-sig", float_format="%.10f")
-    os.replace(tmp, path)
+    _safe_replace(tmp, path)
 
 
 def cache_max_date(df: pd.DataFrame) -> pd.Timestamp | None:
@@ -961,7 +976,7 @@ def write_returns_csv(df: pd.DataFrame, path: Path, dry_run: bool) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f"{path.name}.tmp")
     out.to_csv(tmp, index=False, encoding="utf-8-sig", float_format="%.10f")
-    os.replace(tmp, path)
+    _safe_replace(tmp, path)
 
 
 def write_price_csv(df: pd.DataFrame, path: Path, dry_run: bool) -> None:
@@ -972,7 +987,7 @@ def write_price_csv(df: pd.DataFrame, path: Path, dry_run: bool) -> None:
         return
     tmp = path.with_name(f"{path.name}.tmp")
     out.to_csv(tmp, index=False, encoding="utf-8-sig", float_format="%.10f")
-    os.replace(tmp, path)
+    _safe_replace(tmp, path)
 
 
 def write_summary(
