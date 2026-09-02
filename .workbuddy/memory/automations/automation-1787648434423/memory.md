@@ -8,3 +8,10 @@
 - 结论：**今日无新数据，策略未重算**；未汇报指标，未执行 git commit/push。
 - 附带副作用：每日更新策略 README.md 被脚本改写（本地 modified，未提交，因数据未更新按规则不入库）。
 - 下次有更新的数据日期应 > 2026-08-31 才会触发汇报+提交+推送。
+
+## 2026-09-02 09:05 执行
+- 运行 `daily_update_strategy.py`（venv python），`updated_range=2013-01-04:2026-09-01`，`data_update=updated`，报告 `回测报告_2026-09-01.md`。
+- 数据日期 2026-09-01 **> 上次 2026-08-31** → 确认为新交易日，有更新。
+- 核心指标（v0.19）：净值 2.5980 / 年化 12.13% / 年化波动 6.55% / 夏普 1.78 / 最大回撤 -7.79% / 日胜率 56.52%；股指信号 0.70→仓位 21%；近1月 1.58%、近3月 0.19%、YTD 5.92%。
+- 已 `git add -A` 并提交（abb747f，12 文件变更，含数据/输出更新与 memory）。
+- **git push origin main 失败**：`fatal: unable to access ... Recv failure: Connection was reset`（网络/SSL 连接被重置）；按规则不阻塞，仅汇报失败原因。本地提交已就绪，网络恢复后可手动 `git push origin main`。
