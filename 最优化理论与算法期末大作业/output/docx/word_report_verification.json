@@ -1,0 +1,80 @@
+{
+  "docx": "C:\\Users\\84522\\Documents\\风险平价及全天候模型\\huatai-risk-parity-replication\\最优化理论与算法期末大作业\\output\\docx\\最优化理论与算法期末大作业_风险平价.docx",
+  "pdf": "C:\\Users\\84522\\Documents\\风险平价及全天候模型\\huatai-risk-parity-replication\\最优化理论与算法期末大作业\\output\\pdf\\最优化理论与算法期末大作业_风险平价.pdf",
+  "source_docx": "C:\\Users\\84522\\Documents\\风险平价及全天候模型\\huatai-risk-parity-replication\\最优化理论与算法期末大作业\\output\\docx\\最优化理论与算法期末大作业_风险平价.docx",
+  "export_engine": "Microsoft Word",
+  "word_version": "16.0",
+  "word_statistics": {
+    "page_count": 13,
+    "word_count": 5839,
+    "character_count": 7952
+  },
+  "file_size_bytes": 807550,
+  "docx_size_bytes": 612815,
+  "docx_sha256": "899ba6a6ec31cb83b78027391e094a418b4053fa63853a346a8e585b567623eb",
+  "pdf_sha256": "8ac34c54c193582101876226c9fe8797596df8bdc96e6c8907ea46b60e5ca17f",
+  "page_count": 13,
+  "page_size_points": [
+    595.44,
+    841.68
+  ],
+  "selectable_text_characters": 10229,
+  "required_terms": [
+    "凸等价重构",
+    "阻尼牛顿法",
+    "Armijo回溯",
+    "一般风险预算",
+    "风险贡献",
+    "参考文献"
+  ],
+  "missing_required_terms_docx": [],
+  "missing_required_terms_pdf": [],
+  "forbidden_terms_found": [],
+  "missing_key_numbers": [],
+  "field_counts": {
+    "TOC": 4,
+    "PAGE": 2,
+    "SEQ": 9,
+    "REF": 9
+  },
+  "native_equation_count": 13,
+  "title_style_fonts": {
+    "Heading 1": "宋体",
+    "Heading 2": "宋体",
+    "Heading 3": "宋体",
+    "Caption": "宋体"
+  },
+  "pdf_base_fonts": [
+    "/BCDEEE+SimSun",
+    "/BCDFEE+TimesNewRomanPSMT",
+    "/BCDGEE+TimesNewRomanPS-BoldMT",
+    "/BCDHEE+TimesNewRomanPS-BoldMT",
+    "/BCDIEE+SimSun",
+    "/BCDJEE+TimesNewRomanPSMT",
+    "/BCDKEE+CambriaMath",
+    "/BCDLEE+CambriaMath",
+    "/BCDMEE+ArialMT"
+  ],
+  "unexpected_title_fonts": [],
+  "checks": {
+    "docx_exists": true,
+    "pdf_exists": true,
+    "export_engine_is_word": true,
+    "word_pdf_page_count_matches": true,
+    "page_count_within_reasonable_range": true,
+    "all_pages_a4": true,
+    "selectable_pdf_text": true,
+    "required_terms_present": true,
+    "forbidden_reference_content_absent": true,
+    "key_numbers_present": true,
+    "toc_present": true,
+    "page_fields_present": true,
+    "caption_fields_present": true,
+    "cross_reference_fields_present": true,
+    "native_equations_present": true,
+    "title_fonts_are_simsun": true,
+    "word_pdf_has_no_fallback_title_fonts": true
+  },
+  "personal_info_pending": false,
+  "status": "passed"
+}
