@@ -23,3 +23,18 @@
 - 已 `git add -A` 并提交 `82bc8d3`（10 文件变更）。
 - **git push origin main 成功**：`1a22077..82bc8d3`，同时把 09-02 那次未推成功的提交一并同步；`git ls-remote` 核对远程 = 本地 = 82bc8d3，仓库已完全同步。
 - 经验：push 链路故障属临时性，隔日重试即可恢复，无需额外干预。
+
+## 2026-09-08 08:40 手动触发「更新数据」
+- 运行 `daily_update_strategy.py`，`updated_range=2013-01-04:2026-09-07`，`data_update=updated`，报告 `回测报告_2026-09-07.md`。
+- 数据日期 2026-09-07 **> 上次 2026-09-02** → 跨多个交易日，属新数据。
+- 核心指标（v0.19）：净值 2.5974 / 年化 12.10% / 年化波动 6.55% / 夏普 1.78 / 最大回撤 -7.79% / 日胜率 56.51%；上一交易日 +0.17%、近1月 +0.84%、近3月 +0.69%、YTD +5.90%。较 09-02 全线回升。
+- 股指信号仍 0.70→仓位 21%；**最后人工填值 2026-08-27，距今 12 天，逼近 15 天提醒阈值**（本次仍维持）。
+- 已 `git add -A` 并提交 `adaae79`（10 文件变更）。
+- **git push origin main 失败**：`Recv failure: Connection was reset` / `Failed to connect to github.com:443 ... Could not connect to server`，`git ls-remote` 亦连不上 → GitHub 443 临时故障，与 09-02 同性质。本地提交保留，未阻塞；下次更新时优先重试 push。
+
+## 2026-09-08 09:06 定时执行（automation-1787648434423）
+- 运行 `daily_update_strategy.py`（venv python），`updated_range=2013-01-04:2026-09-07`，`data_update=updated`，报告 `回测报告_2026-09-07.md`。
+- **数据日期 2026-09-07 与上次（09-08 08:40 手动触发）相同** → 判定为「无新数据」，策略未重算；按规则未汇报指标、未重新 git commit。
+- **补推 09-08 那次失败提交**：本地 HEAD `adaae79` 仍 1 个待推送（09-08 因 GitHub 443 故障未推成功）；远程真实 SHA 经 `git ls-remote` 核对为 `621602cc`，且为 `adaae79` 的祖先，可快进。
+- **git push origin main 成功**：`621602c..adaae79`，远程 `origin/main` 现已同步至 `adaae79`（与本地一致）。**仓库完全同步，待推送清零。**
+- 工作树仍有未提交改动（自动化 memory.md、数据更新 README.md、新增 `.workbuddy/memory/2026-09-08.md`），按「无新数据不 commit」规则保留未提交，不影响已同步的远程状态。
