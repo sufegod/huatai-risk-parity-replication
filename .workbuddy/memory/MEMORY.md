@@ -5,6 +5,8 @@
 - **后果**：`git status -sb` 会虚报 `ahead 29/30`，这是**幽灵领先**，不代表真的有那么多提交没推。
 - **正确做法**：用 `git ls-remote origin` 取远程真实 SHA，再 `git log --oneline <远程SHA>..main` 看真实待推送提交。不要相信 `origin/main`。
 - **GitHub 链路不稳定**：push 常报 `CONNECT tunnel failed, response 502` 或 `schannel: server closed abruptly (missing close_notify)`；严重时连 `ls-remote` 也 502（透明代理故障，git config 与 env 均未配代理）。属临时性故障，换个时间重试往往能成功（8/31 曾成功推送）。
+- **失败呈「同日间歇性」（2026-09-11 实测）**：同一天 10:13、10:51 两次 push 失败（`Recv failure: Connection was reset` / `Failed to connect to github.com:443`），11:25 原样重试即成功且仅 13 秒推完 3 个提交。⇒ **遇失败不要改 git 配置**（改 `http.postBuffer`/`http.version` 无必要，反而留下残留配置），隔几十分钟原样重试即可；大文件（19MB csv）在慢链路下 push 可能挂起 20+ 分钟才报错，属正常现象。
+- **推送前必做**：`git ls-remote origin` 取远程真实 SHA → `git log --oneline <远程SHA>..main` 列真实待推送提交，据此汇报积压数量（避免只凭猜测说「1 个提交」）。
 - GitHub SSH(443) 网络可达，但本机**未配置 SSH key**（`Permission denied (publickey)`），暂不能作为 https 的备份通道。
 
 ## 策略与流程约定

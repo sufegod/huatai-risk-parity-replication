@@ -71,3 +71,9 @@
 - 重试 push 两次均失败：一次传输 21 分钟后 `RPC failed; curl 56 Recv failure: Connection was reset`（sideband 中断），另一次 `Failed to connect to github.com:443`。**GitHub 链路呈间歇性**（02:59 时 ls-remote 曾短暂恢复，随后又断）。
 - 临时调过 `http.postBuffer=500MB`/`http.version=HTTP/1.1` 未奏效，**已还原**，仓库 http.* 配置恢复为空。
 - 结论：本地提交安全保留，远程落后 3 个提交，待网络稳定后重推即可。
+
+## 2026-09-11 11:25 手动「同步」——积压清零
+- 远程链路恢复，`git push origin main` **成功**：`247d8a6..f4f6508`（13 秒推完 3 个积压提交：aeeba27 / b71f007 / f4f6508）。
+- 追加提交本次 memory 文档并推送：`f4f6508..450922a`。
+- **最终：远程 main = 本地 main = `450922a`，工作树干净，待推送清零。**
+- 经验补充：GitHub 443 故障属**同日间歇性**——10:13 与 10:51 两次失败，11:25 恢复且速度正常（13 秒）。**遇 push 失败无需调配置，隔一段时间原样重试即可**（此前的 postBuffer/http.version 调整无必要）。
