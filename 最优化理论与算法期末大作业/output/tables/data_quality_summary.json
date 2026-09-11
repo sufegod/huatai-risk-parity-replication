@@ -1,0 +1,17 @@
+{
+  "source": "数据/原始数据/ETF风险平价回测数据.xlsx",
+  "sheet_index": 0,
+  "rows": 3216,
+  "assets": 9,
+  "start_date": "2013-01-04",
+  "end_date": "2026-04-03",
+  "duplicate_dates": 0,
+  "exact_duplicate_rows": 0,
+  "missing_cells_before_fill": 3,
+  "missing_cells_after_fill": 0,
+  "min_return": -0.100052,
+  "max_return": 0.099913,
+  "date_monotonic": true,
+  "fill_rule": "three isolated missing asset-day returns filled with zero",
+  "known_limitation": "pre-ETF-history uses project-provided index proxies"
+}
