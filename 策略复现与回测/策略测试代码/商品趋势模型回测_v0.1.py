@@ -28,7 +28,9 @@ plt.rcParams['axes.unicode_minus'] = False
 
 BASE = Path(__file__).resolve().parent
 PROJECT = BASE.parents[1]
-PRICE_FILE = PROJECT / '数据' / '日度收益数据更新' / '期货主力前复权收盘价.csv'
+# 数据已与原「全天候/风险平价」策略物理隔离：读取本策略专属副本
+# （副本位于 商品趋势模型/历史数据/，源目录 数据/日度收益数据更新/ 视为只读，不再直接引用）
+PRICE_FILE = PROJECT / '商品趋势模型' / '历史数据' / '期货主力前复权收盘价.csv'
 OUT_DIR = PROJECT / '策略复现与回测' / '策略测试结果' / '商品趋势模型_v0.1'
 
 ASSETS = ['沪金主连', '豆粕主连', '沪铜主连', '沪铝主连', 'PTA主连', '原油主连']
