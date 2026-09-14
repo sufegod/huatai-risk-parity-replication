@@ -77,3 +77,18 @@
 - 追加提交本次 memory 文档并推送：`f4f6508..450922a`。
 - **最终：远程 main = 本地 main = `450922a`，工作树干净，待推送清零。**
 - 经验补充：GitHub 443 故障属**同日间歇性**——10:13 与 10:51 两次失败，11:25 恢复且速度正常（13 秒）。**遇 push 失败无需调配置，隔一段时间原样重试即可**（此前的 postBuffer/http.version 调整无必要）。
+
+## 2026-09-14 09:00 定时执行（automation-1787648434423）
+- 运行 `daily_update_strategy.py`（venv python），`updated_range=2013-01-04:2026-09-11`，`data_update=updated`，报告 `回测报告_2026-09-11.md`。
+- 数据日期 2026-09-11 **> 上次 2026-09-10** → 新交易日（09-12/09-13 为周末非交易日），有更新。
+- 核心指标（v0.19）：净值 2.5947 / 年化 12.06% / 年化波动 6.55% / 夏普 1.77 / 最大回撤 -7.79% / 日胜率 56.49%；股指信号 0.70→仓位 21%（**有意维持，不提示补录**）；上一交易日 -0.49%、近1月 +0.68%、近3月 +0.96%、YTD +5.79%。
+- 最新10大持仓：10年国债 53.96%、沪深300 10.50%、中证500 10.50%、豆粕 6.66%、红利低波ETF 4.60%、沪铝 4.46%、沪铜 3.54%、沪金 2.38%、PTA 2.03%、原油 1.37%。
+- 已 `git add -A` 并提交 `ba4f37a`（7 文件变更，数据层更新）。
+- **git push origin main 失败**：`Failed to connect to github.com:443 ... Could not connect to server`（GitHub 443 临时故障，与 09-08/09-11 同性质）；`git ls-remote` 亦连不上，远程真实 SHA 未核对。本地提交保留，未阻塞。
+- 待推送积压：本地 main = `ba4f37a`；含 09-11 同步后未推的 5 个 memory 提交（`b2c3ee0`→`aee3c6a`）+ 本次 `ba4f37a` 共 6 个待推送。网络恢复后 `git push origin main` 即可同步。
+
+## 2026-09-14 14:06 手动「更新程序」重触发
+- 重跑 `daily_update_strategy.py`（venv python），脚本 exit 0；最新报告仍为 `回测报告_2026-09-11.md`（无 `2026-09-14` 新报告）→ **数据日期未变（仍为 2026-09-11），今日无新数据，策略未重算**。按规则未汇报指标、未新增提交。
+- 借此次重触发**重试今早失败的 push**：`git push origin main` 成功，真实远程从 `01e00ce` 推进至 `ba4f37a`（`01e00ce..ba4f37a main -> main`）。`git ls-remote` 核对远程 HEAD/main = `ba4f37a` = 本地 HEAD → **仓库完全同步，待推送清零**。
+- 注：Shell 环境 PATH 在上午 push 后损坏（Bash 缺失 coreutils/git，PowerShell 输出吞掉）；改用 PortableGit 的 `bash.exe -l`（login shell 自加载 PATH）完成 push。这是环境/工具问题，非数据或网络问题。
+- 遗留未提交改动（非策略数据，按"无新数据不 commit"规则保留）：自动化 memory.md、工作树 `数据更新 README.md`、新增 `.workbuddy/memory/2026-09-14.md`；下次有数据更新的提交会一并纳入。
