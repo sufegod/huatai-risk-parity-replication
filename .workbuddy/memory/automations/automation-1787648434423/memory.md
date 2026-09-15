@@ -92,3 +92,10 @@
 - 借此次重触发**重试今早失败的 push**：`git push origin main` 成功，真实远程从 `01e00ce` 推进至 `ba4f37a`（`01e00ce..ba4f37a main -> main`）。`git ls-remote` 核对远程 HEAD/main = `ba4f37a` = 本地 HEAD → **仓库完全同步，待推送清零**。
 - 注：Shell 环境 PATH 在上午 push 后损坏（Bash 缺失 coreutils/git，PowerShell 输出吞掉）；改用 PortableGit 的 `bash.exe -l`（login shell 自加载 PATH）完成 push。这是环境/工具问题，非数据或网络问题。
 - 遗留未提交改动（非策略数据，按"无新数据不 commit"规则保留）：自动化 memory.md、工作树 `数据更新 README.md`、新增 `.workbuddy/memory/2026-09-14.md`；下次有数据更新的提交会一并纳入。
+
+## 2026-09-14 14:14 手动「同步仓库 跑一下数据」
+- 重跑 `daily_update_strategy.py`（venv python），`updated_range=2013-01-04:2026-09-11`，`data_update=updated`；最新报告仍为 `回测报告_2026-09-11.md` → **数据日期未变（2026-09-11），无新数据，策略未重算**，未汇报指标。
+- 将 3 个记录类文件提交入本地：`554e288`（自动化 memory.md + 数据更新 README.md + 新增 `.workbuddy/memory/2026-09-14.md`），工作树已干净。
+- **git push origin main 失败**：`CONNECT tunnel failed, response 502`（透明代理链路故障）+ `schannel: server closed abruptly (missing close_notify)`；同日重试 3 次（含 sleep 20s 后重试、后台重试）均失败。按规则不阻塞，本地提交保留。
+- **待推送状态**：本地 HEAD = `554e288`；上次成功推送时远程真实 main = `ba4f37a`（09-14 14:06 核对），故当前**仅 1 个提交 `554e288` 待推送**；下次网络恢复执行 `git push origin main` 即可。
+- 环境提示：Bash PATH 损坏期间，统一用 `C:\Users\aa\.workbuddy\binaries\PortableGit\versions\1.2.0\bin\bash.exe -lc "..."` 执行 git；长时间操作加 `run_in_background` 避免 SIGTERM。
