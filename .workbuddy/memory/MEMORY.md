@@ -9,6 +9,20 @@
 - **推送前必做**：`git ls-remote origin` 取远程真实 SHA → `git log --oneline <远程SHA>..main` 列真实待推送提交，据此汇报积压数量（避免只凭猜测说「1 个提交」）。
 - GitHub SSH(443) 网络可达，但本机**未配置 SSH key**（`Permission denied (publickey)`），暂不能作为 https 的备份通道。
 
+## ⚠️ 本机 Shell PATH 损坏的绕行方案（2026-09-14 起，重要）
+- **症状**：Bash 工具报 `dirname: command not found`、`cd: null directory`，`tr`/`head`/`tail`/`git` 等全部 127 找不到；PowerShell 工具 stdout 被吞（命令显示 exit 0/1 但无输出）。Python 仍可直接用绝对路径运行。
+- **根因**：工作区 shell 的 PATH 环境变量丢失，非仓库问题。
+- **✅ 绕行（已验证可用）**：所有 git/需要 coreutils 的命令，一律走 PortableGit 的 **login shell**（`-l` 会自行加载 PATH）：
+  ```
+  /c/Users/aa/.workbuddy/binaries/PortableGit/versions/1.2.0/bin/bash.exe -lc "cd <repo> && git ... "
+  ```
+- **配套注意**：
+  - 运行 Python 脚本并在 Bash 里看中文输出，须加 `PYTHONIOENCODING=utf-8`，否则中文乱码/无输出。
+  - 用 Python 脚本（`Write` 写 .py 再跑）比在命令行内联多行脚本更可靠，避免引号与编码问题。
+  - **push 等长时间操作必须用 `run_in_background=true`**：慢链路推 19MB csv，前台 400s 会 SIGTERM 中断，后台则正常完成。
+  - 不要把 `tr -d '\r'` 用在 Bash 管道里（`tr` 恰好不可用）。
+- **恢复**：重启 IDE/终端通常可恢复 PATH；未恢复前按上述方式操作。
+
 ## 策略与流程约定
 - 「更新策略」= 运行 `策略复现与回测/每日更新策略/daily_update_strategy.py`（venv: `C:/Users/aa/.workbuddy/binaries/python/envs/default/Scripts/python.exe`），更新数据至最新交易日 + 重算回测。
 - 每日 15:30 自动化任务（automation-1787648434423）：更新 → 读报告 → add/commit → 尝试 push；push 失败仅汇报不阻塞。
