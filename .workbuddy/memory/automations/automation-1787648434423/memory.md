@@ -154,3 +154,12 @@
 - **09-17=0.3 仍未生效**（无 09-17 行情）；待 JYDB 入库 09-17 后重跑，股指仓位将降至 9%。
 - 重跑重写 `数据/日度收益数据更新/日度收益数据更新摘要.md`；连同 9c58ffe（信号调整，此前 push 被 kill 未送达远程）一并提交 `d8fbf1a` 并尝试 push origin main。
 - **push 实际失败**（task maP83q，42s 退出但 `git ls-remote` 核对远程 main 仍为 `ba783fa`，本地领先 9c58ffe+d8fbf1a 两个提交未送达）：日志报 `schannel: server closed abruptly (missing close_notify)`，属间歇性 SSL/TLS 中断。按规则不阻塞流程，本地已提交；待网络恢复后重试 push 即可（勿改 git 配置）。
+
+## 2026-09-18 09:01 定时执行（automation-1787648434423）
+- 运行 `daily_update_strategy.py`（venv python），`updated_range=2013-01-04:2026-09-17`，`data_update=updated`，报告 `回测报告_2026-09-17.md`。
+- 数据日期 2026-09-17 **> 上次 2026-09-16** → 新交易日，有更新；**且昨日用户设的 09-17=0.3 信号本日生效**（JYDB 09-17 数据已入库）。
+- 核心指标（v0.19）：净值 2.6002 / 年化 12.07% / 年化波动 6.54% / 夏普 1.77 / 最大回撤 -7.79% / 日胜率 56.48%；股指信号 0.30→仓位 9.00%（IF/IC 各 4.50%）；上一交易日 -0.20%、近1月 +0.35%、近3月 +0.58%、YTD +6.01%。
+- 最新10大持仓：10年国债 64.13%、豆粕 6.90%、沪铝 4.96%、红利低波ETF 4.94%、中证500 4.50%、沪深300 4.50%、沪铜 3.81%、沪金 2.63%、PTA 2.21%、原油 1.41%。
+- 已 `git add -A` 并提交 `7a112c2`（8 文件变更，数据层更新 + 自动化 memory）。
+- **git push origin main 失败（重试 2 次均败）**：`Recv failure: Connection was reset` / `Failed to connect to github.com:443 ... Could not connect to server`（GitHub 443 间歇性故障，与历史同性质）。本地提交保留，未阻塞。
+- **待推送积压（3 个）**：远程真实 main 仍停在 `ba783fa`；本地领先 `9c58ffe`（09-17 信号调整）、`d8fbf1a`（09-16 重算确认）、`7a112c2`（本日更新）。网络恢复后 `git push origin main` 即可一并同步（勿改 git 配置，隔段重试）。
