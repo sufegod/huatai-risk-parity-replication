@@ -163,3 +163,12 @@
 - 已 `git add -A` 并提交 `7a112c2`（8 文件变更，数据层更新 + 自动化 memory）。
 - **git push origin main 失败（重试 2 次均败）**：`Recv failure: Connection was reset` / `Failed to connect to github.com:443 ... Could not connect to server`（GitHub 443 间歇性故障，与历史同性质）。本地提交保留，未阻塞。
 - **待推送积压（3 个）**：远程真实 main 仍停在 `ba783fa`；本地领先 `9c58ffe`（09-17 信号调整）、`d8fbf1a`（09-16 重算确认）、`7a112c2`（本日更新）。网络恢复后 `git push origin main` 即可一并同步（勿改 git 配置，隔段重试）。
+
+## 2026-09-21 09:07 定时执行（automation-1787648434423）
+- 运行 `daily_update_strategy.py`（venv python），`updated_range=2013-01-04:2026-09-18`，`data_update=updated`，报告 `回测报告_2026-09-18.md`。
+- 数据日期 2026-09-18 **> 上次 2026-09-17** → 新交易日（09-19/09-20 周末非交易日），有更新。
+- 核心指标（v0.19）：净值 2.5994 / 年化 12.06% / 年化波动 6.54% / 夏普 1.77 / 最大回撤 -7.79% / 日胜率 56.45%；股指信号 0.30→仓位 9.00%（IF/IC 各 4.50%，延续 09-17 用户设定，有意维持）；上一交易日 -0.03%、近1月 +0.26%、近3月 +0.52%、YTD +5.98%。
+- 最新10大持仓：10年国债 65.96%、豆粕 5.13%、红利低波ETF 5.07%、沪铝 5.06%、中证500 4.50%、沪深300 4.50%、沪铜 3.86%、沪金 2.67%、PTA 2.06%、原油 1.17%。
+- 已 `git add -A` 并提交 `7cd86ac`（8 文件变更，数据层更新 + memory）。
+- **git push origin main 成功**（后台 19m20s）：`ba783fa..7cd86ac`，把前期 3 个积压提交（`9c58ffe`/`d8fbf1a`/`7a112c2`）与本次一并同步；远程 HEAD/main = `7cd86ac` = 本地 HEAD → **仓库完全同步，待推送清零**。
+- 注：push 经慢链路（19MB 期货 csv）挂起约 19 分钟仍正常完成，无需改 git 配置；下次仍用 PortableGit login shell + 后台执行规避超时。
