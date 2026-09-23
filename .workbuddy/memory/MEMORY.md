@@ -94,7 +94,8 @@ normalize: signal <= 0 或 NaN → 0；否则 min(signal, 1.0)
 - **数据库**：SQL Server 内网实例 **`192.168.10.48`**（默认端口 1433），同一实例上有两个库：
   - **`JYDB`**（聚源数据库，主库）—— 期货主力行情 `Fut_TradingQuote`、指数 `QT_IndexQuote`、ETF（`512890.SH`）等。
   - **`FTDB`** —— 一天期国债逆回购 GC001：`FTDB.dbo.ths_GC`，代码 `204001.SH`，字段 `ths_wgt_avg_interest_bbond`。
-- **连接方式**：Python `pyodbc` + **`ODBC Driver 17 for SQL Server`**；账号 **`tsreadonly`（只读）**；连接串 `Encrypt=no;TrustServerCertificate=yes;`。
+- **连接方式**：Python `pyodbc`；账号 **`tsreadonly`（只读）**；连接串含 `Encrypt=no;TrustServerCertificate=yes;`。
+- **⚠️ ODBC 驱动坑（2026-09-23 实测）**：本机**已无「ODBC Driver 17 for SQL Server」**（注册表只余旧的 `SQL Server` 32/64 位驱动）。脚本默认/`.env` 原写 17 → 跑批报 `IM002 未发现数据源名称`。**修复**：`.env` 的 `JYDB_DRIVER` 已改为 `"SQL Server"`（旧驱动实测可连 JYDB、且兼容 `Encrypt=no` 属性）。脚本经 `load_env_file` 自动注入 `.env`，手动与每日自动化均沿用此驱动。若日后重装 17/18 可改回，但当前环境只能用 `SQL Server`。
 - **密码不落盘**：从**仓库根目录 `.env`** 读取 `JYDB_PWD`（另有 `JYDB_SERVER/DATABASE/UID/DRIVER`）。`.env` 还含 `IFIND_MCP_URL`/`IFIND_MCP_AUTHORIZATION`（iFinD 残留配置，每日更新脚本已不再使用 iFinD）。
 - **唯一连库入口**：`数据/日度收益数据更新/日度收益数据更新.py`（另有 query_ic500.py / debug_ic500.py / compare_ic500_vs_im1000.py / _conn_probe.py 等调试脚本走同一实例）。
 - **策略只读本地文件**：v0.19 读取 `数据/日度收益数据更新/日涨跌幅_填充.csv`、`日涨跌幅_未填充.csv`、`数据/原始数据/股指期货信号.xlsx`。
