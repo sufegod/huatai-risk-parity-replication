@@ -189,5 +189,5 @@
 - 核心指标（v0.19）：净值 2.5934 / 年化 12.00% / 年化波动 6.53% / 夏普 1.77 / 最大回撤 -7.79% / 日胜率 56.44%；股指信号 0.50→仓位 15.00%（延续 09-22 用户设定 0.5，有意维持）；上一交易日 -0.14%、近1月 +0.49%、近3月 +0.66%、YTD +5.74%。
 - 最新10大持仓：10年国债 61.28%、沪深300 7.50%、中证500 7.50%、豆粕 4.89%、红利低波ETF 4.84%、沪铝 4.79%、沪铜 3.73%、沪金 2.55%、PTA 1.88%、原油 1.04%。
 - 已 `git add -A` 并提交（数据层更新 09-24 + 本报告 memory + 自动化 memory + 用户遗留 `2026-09-24.md`；输出/ 仍被 .gitignore 忽略不入库）。
-- **git push origin main 失败（09-28 首试清理积压即败）**：`Failed to connect to github.com:443 after 21094 ms: Could not connect to server`（22s 连接超时）；`git ls-remote` 亦连不上，远程真实 SHA 未核对。GitHub 443 间歇性故障，与历史同性质；本地提交保留，未阻塞。
-- **待推送积压（约 5 个）**：远程真实状态未核对；本地领先历史为 `5aada4d`/`b07e895`/`a4ddc9d`/`36d7a9e`/本次 09-24 共 5 个提交。待网络恢复后 `git push origin main` 即可一并同步（勿改 git 配置，隔段重试）。
+- **git push origin main 失败（09-28 两次尝试均败）**：首试清理积压即 `Failed to connect to github.com:443 after 21094 ms: Could not connect to server`（22s 连接超时）；提交后二试 `Recv failure: Connection was reset`（78s 中断）。`git ls-remote` 亦连不上，远程真实 SHA 未核对。GitHub 443 间歇性故障，与历史同性质；本地提交保留，未阻塞。
+- **待推送积压（约 5 个）**：远程真实状态未核对；本地领先历史为 `5aada4d`/`b07e895`/`a4ddc9d`/`36d7a9e`/本次 `4711c27`(09-24) 共 5 个提交。待网络恢复后 `git push origin main` 即可一并同步（勿改 git 配置，隔段重试）。
