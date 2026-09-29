@@ -32,3 +32,6 @@ ShaderCache/
 # Generated outputs and mutable caches
 策略复现与回测/每日更新策略/输出/
 数据/日度收益数据更新/增量缓存/*.csv
+
+# 临时备份：错误现金口径产物（2026-09-28 清理，确认后可删）
+.backup_wrong_cash_caliber_2026-09-28/
