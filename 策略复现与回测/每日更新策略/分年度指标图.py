@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-生成华泰风险平价策略 v0.19 分年度指标汇报图：
+生成风险平价策略 v0.19 分年度指标汇报图：
   - 柱状：各年夏普比率
   - 折线：各年最大回撤（右轴）
 用法：
@@ -108,9 +108,10 @@ def main():
     ax1.set_axisbelow(True)
     ax1.spines["top"].set_visible(False)
     ax1.spines["right"].set_visible(False)
+    tot_txt = f"{total['sharpe']:.2f}" if total and total.get("sharpe") is not None else "-"
     ax1.set_title(
-        f"华泰风险平价策略 v0.19 · 分年度夏普与最大回撤（数据至 {date_tag}）\n"
-        "九年夏普全部 > 1，全周期 1.78 —— 低波动、低回撤下的稳定风险调整收益",
+        f"风险平价策略 v0.19 · 分年度夏普与最大回撤（数据至 {date_tag}）\n"
+        f"九年夏普全部 > 1，全周期 {tot_txt} —— 低波动、低回撤下的稳定风险调整收益",
         fontsize=15, fontweight="bold", pad=14)
 
     # ================= 下panel：最大回撤线 =================
