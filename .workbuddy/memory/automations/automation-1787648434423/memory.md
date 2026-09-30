@@ -206,3 +206,12 @@
 - 最新10大持仓：10年国债 61.97%、沪深300 7.50%、中证500 7.50%、红利低波ETF 5.06%、沪铝 4.57%、豆粕 4.16%、沪铜 3.90%、沪金 2.33%、PTA 1.93%、原油 1.09%。
 - 归档提交 `8cb13c3`（补录 `.workbuddy/memory/2026-09-29.md` 运行记忆 + 重生成的数据摘要 md）；本地 `main` 领先 `origin/main` **3 个提交**（`b1185e7`/`2dc178d`/`8cb13c3`）。
 - **git push origin main 失败**（后台 54s）：`RPC failed; curl 55 Send failure: Connection was reset` / `send-pack: unexpected disconnect`（GitHub 443 单点链路阻断，与 08:45–08:58 同因）。`PUSH_EXIT=1`，按规则不阻塞，本地提交保留；网络恢复后 `git push origin main` 即可同步（勿改 git 配置，隔段重试）。
+
+## 2026-09-30 09:07 定时执行（automation-1787648434423）
+- 运行 `daily_update_strategy.py`（venv python），`updated_range=2013-01-04:2026-09-29`，`data_update=updated`，报告 `回测报告_2026-09-29.md`。
+- 数据日期 2026-09-29 **> 上次本自动化汇报（2026-09-28）** → 新交易日，有更新。
+- 核心指标（v0.19）：净值 2.5792 / 年化 11.92% / 年化波动 6.54% / 夏普 1.76 / 最大回撤 -7.79% / 日度胜率 56.44%；股指信号 0.50→仓位 15.00%（延续 09-22 用户设定 0.5，有意维持）；上一交易日 +0.10%、近1月 -0.67%、近3月 +0.18%、YTD +5.16%。
+- 最新10大持仓：10年国债 62.00%、沪深300 7.50%、中证500 7.50%、红利低波ETF 5.06%、沪铝 4.57%、豆粕 4.15%、沪铜 3.90%、沪金 2.31%、PTA 1.94%、原油 1.08%。
+- 已 `git add -A` 并提交 `3e85a7f`（28 文件变更，含数据层 09-29 更新 + 历史遗留分析脚本 analyze_*/plot_*/rebuild_full 等 + memory）。
+- **git push origin main 失败**（后台 23s）：`Recv failure: Connection was reset`（GitHub 443 间歇性故障，与历史同性质）；`git ls-remote` 亦连不上（`Failed to connect to github.com:443 ... Could not connect to server`），远程真实 SHA 未核实。本地提交保留，未阻塞。
+- **待推送积压（4 个）**：`git rev-list --count origin/main..main = 4`（即 09-29 遗留 3 个 + 本次 `3e85a7f` 共 4 个）。网络恢复后 `git push origin main` 即可一并同步（勿改 git 配置，隔段重试）。
