@@ -1,0 +1,10 @@
+{
+  "selection_period": "train",
+  "selection_rule": "highest Sharpe, then less severe maximum drawdown",
+  "decay": 0.9,
+  "window": 252,
+  "train_sharpe": 1.9574860518825279,
+  "train_max_drawdown": -0.06081628858216381,
+  "validation_sharpe": 1.8699615980542705,
+  "validation_max_drawdown": -0.0348376830914906
+}
