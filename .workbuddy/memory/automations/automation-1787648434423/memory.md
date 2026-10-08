@@ -223,6 +223,15 @@
 - `git status`：1 个 modified（`数据/日度收益数据更新/日度收益数据更新摘要.md`，脚本重生成但数据日期未变，按规则保留不提交）+ 1 个 untracked（`.workbuddy/memory/2026-09-30.md`）。
 - 尝试 `git ls-remote origin` / `git fetch origin` 均失败：`fatal: unable to access ... Recv failure: Connection was reset`（GitHub 443 间歇性故障，网络当前不可用）；后台 fetch 挂起 3m29s 已终止。因无新数据本就不 commit，push 受网络阻断亦无法进行，未阻塞流程。待网络恢复后若 tracking ref 确为 stale 且存在积压，再 `git push origin main` 即可（勿改 git 配置）。
 
+## 2026-10-08 16:40 定时执行（automation-1787648434423）
+- 运行 `daily_update_strategy.py`（venv python），`updated_range=2013-01-04:2026-10-08`，`data_update=updated`，报告 `回测报告_2026-10-08.md`（国庆后首个交易日数据落库）。
+- 数据日期 2026-10-08 **> 上次汇报（2026-09-29）** → 新交易日，有更新。
+- 核心指标（v0.19）：净值 2.5786 / 年化 11.90% / 年化波动 6.53% / 夏普 1.75 / 最大回撤 -7.79% / 日度胜率 56.43%；股指信号 **0.30→仓位 9.00%**（相对 09-29 的 0.5/15%，信号已下调至 0.3 并自 09-28 生效，ffill 至 10-08）；上一交易日 +0.04%、近1月 -0.98%、近3月 +0.50%、YTD +5.13%。
+- 最新10大持仓：10年国债 62.34%、红利低波ETF 6.61%、豆粕 5.34%、沪铜 5.17%、沪铝 4.89%、沪深300 4.50%、中证500 4.50%、沪金 2.82%、PTA 2.45%、原油 1.39%。
+- 数据提交已由流程落地（`b9afe27` 数据更新 + `41123b9` memory，作者 aa 16:39/16:41）；工作树干净。
+- **git push origin main 失败（重试 2 次均败）**：`schannel: server closed abruptly (missing close_notify)`（GitHub 443 间歇性 SSL 中断，与历史同性质）；`git ls-remote` 亦 SIGTERM 连不上，远程真实 SHA 未核对。本地提交保留，未阻塞。
+- **待推送积压（1 个，视远程状态而定）**：`git rev-list --count origin/main..main = 1`（仅 `41123b9` 领先；`b9afe27` 或已随早前推送入库或被追踪引用视为已同步，因网络故障未能用 ls-remote 确证）。网络恢复后 `git push origin main` 即可同步（勿改 git 配置，隔段重试）。
+
 ## 2026-10-08 09:12 定时执行（automation-1787648434423）
 - 重跑 `daily_update_strategy.py`（venv python），`updated_range=2013-01-04:2026-09-29`，`data_update=updated`，最新报告仍为 `回测报告_2026-09-29.md`。
 - **数据日期 2026-09-29 与上次本自动化（今日 08:28）相同** → 判定「今日无新数据，策略未重算」；按规则未汇报指标、未 `git add -A`/commit。10-08 为国庆后首个交易日，但盘前（09:12）当日行情尚未落库，JYDB 最新仍为 09-29。
