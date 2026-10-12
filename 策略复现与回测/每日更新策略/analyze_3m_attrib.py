@@ -1,72 +1,63 @@
 # -*- coding: utf-8 -*-
-"""近三个月策略收益按品种归因（贡献度分解）。
-贡献口径：第 i 个品种在交易日 t 的收益贡献 = 持有权重 w_i,t × 品种日收益 r_i,t，
-区间累计 = Σ_t (w_i,t * r_i,t)，所有品种合计 ≈ 策略区间日收益之和。
+"""近三个月策略收益按品种归因（价格口径，与策略实际实现一致）。
+贡献近似 = 区间平均权重 × 品种区间几何涨跌。
+价格源：期货/国债/金/商品 用 期货主力前复权收盘价.csv；
+红利低波ETF 用 增量缓存/红利低波ETF行情.csv(ClosePrice)。
+权重用 策略日度仓位明细 的区间均值。
 """
 import pandas as pd
 import numpy as np
 
 BASE = r"C:\Users\aa\WorkBuddy\2026-05-28-14-41-45\huatai-risk-parity-replication"
-RET_F = f"{BASE}\\数据\\日度收益数据更新\\日涨跌幅_填充.csv"
-WGT_F = f"{BASE}\\策略复现与回测\\每日更新策略\\输出\\仓位明细\\策略日度仓位明细_2026-10-08.csv"
-NAV_F = f"{BASE}\\策略复现与回测\\每日更新策略\\输出\\净值\\策略每日净值走势_2026-10-08.csv"
+FUT = f"{BASE}\\数据\\日度收益数据更新\\期货主力前复权收盘价.csv"
+ETF = f"{BASE}\\数据\\日度收益数据更新\\增量缓存\\红利低波ETF行情.csv"
+WGT = f"{BASE}\\策略复现与回测\\每日更新策略\\输出\\仓位明细\\策略日度仓位明细_2026-10-08.csv"
+NAV = f"{BASE}\\策略复现与回测\\每日更新策略\\输出\\净值\\策略每日净值走势_2026-10-08.csv"
 
-# 策略 10 个品种（资产层，不含股指信号覆盖外的替代品种、不含 GC001 现金）
-ASSETS = ["沪深300主连", "中证500主连", "红利低波ETF", "10年国债主连",
-          "沪铜主连", "沪铝主连", "PTA主连", "原油主连", "豆粕主连", "沪金主连"]
+S = pd.Timestamp("2026-07-08")
+E = pd.Timestamp("2026-10-08")
 
-# 1) 收益
-ret = pd.read_csv(RET_F, parse_dates=["日期"], encoding="utf-8-sig")
-ret = ret.sort_values("日期").set_index("日期")
-# 收益率文件存的是"百分比数值"(0.0438 => 0.0438%)，转成小数分数再计算
-ret = ret[ASSETS].ffill() / 100.0
+fut = pd.read_csv(FUT, index_col=0, parse_dates=True, encoding="utf-8-sig").sort_index()
+etf = pd.read_csv(ETF, index_col=0, parse_dates=True, encoding="utf-8-sig").sort_index()
+wgt = pd.read_csv(WGT, index_col=0, parse_dates=True, encoding="utf-8-sig").sort_index()
+nav = pd.read_csv(NAV, index_col=0, parse_dates=True, encoding="utf-8-sig").sort_index()
+nav_c = nav.columns[0]
 
-# 2) 权重（日度持有权重，ffill 补齐到最新一日）
-wgt = pd.read_csv(WGT_F, parse_dates=["date"], encoding="utf-8-sig")
-wgt = wgt.sort_values("date").set_index("date")
-wcols = [c for c in wgt.columns if c in ASSETS]
-wgt = wgt[wcols].ffill()
+# 9 个品种来自前复权价；红利低波ETF 来自 ETF 文件
+PX = {
+    "沪深300主连": fut["沪深300主连"], "10年国债主连": fut["10年国债主连"],
+    "沪金主连": fut["沪金主连"], "豆粕主连": fut["豆粕主连"],
+    "中证500主连": fut["中证500主连"], "沪铜主连": fut["沪铜主连"],
+    "沪铝主连": fut["沪铝主连"], "PTA主连": fut["PTA主连"], "原油主连": fut["原油主连"],
+    "红利低波ETF": etf["ClosePrice"],
+}
 
-# 3) 净值
-nav = pd.read_csv(NAV_F, index_col=0, parse_dates=True, encoding="utf-8-sig")
-nav = nav.sort_index()
-nav_col = nav.columns[0]
-nav_series = nav[nav_col]
+A = list(PX.keys())
+rows = []
+for a in A:
+    s = PX[a]
+    p0, p1 = s.asof(S), s.asof(E)
+    ret = p1 / p0 - 1.0
+    w = wgt[a].loc[(wgt.index >= S) & (wgt.index <= E)].mean()
+    rows.append((a, ret, w, ret * w))
 
-# 对齐区间：最近三个月（自然日 2026-07-08 -> 2026-10-08）
-END = pd.Timestamp("2026-10-08")
-START = pd.Timestamp("2026-07-08")
-idx = ret.index[(ret.index >= START) & (ret.index <= END)]
-idx = idx.union([END]) if END not in idx else idx
+df = pd.DataFrame(rows, columns=["asset", "ret", "avg_w", "contrib"]).sort_values("contrib")
 
-r = ret.loc[idx, ASSETS]
-w = wgt.reindex(idx).ffill().loc[idx, ASSETS]
+# 净值实际区间收益
+ns = nav.loc[S:E, nav_c]
+geo_nav = ns.iloc[-1] / ns.iloc[0] - 1.0
 
-# 逐品种贡献（权重 × 收益），区间累计
-contrib = (w * r).sum(axis=0)  # Series: 品种 -> 累计贡献(pct, 小数)
-
-# 策略区间收益：两种口径
-nav_start = nav_series.asof(START)
-nav_end = nav_series.asof(END)
-geo_ret = nav_end / nav_start - 1.0          # 几何（净值法）
-daily = (w * r).sum(axis=1)                   # 每日策略收益(算术加和)
-arith_ret = daily.sum()                       # 算术累计
-
-print("=" * 60)
-print(f"区间 {START.date()} ~ {END.date()}  共 {len(idx)} 个交易日")
-print(f"净值法几何收益 : {geo_ret*100:+.4f}%")
-print(f"日收益算术累计 : {arith_ret*100:+.4f}%")
-print(f"贡献合计(Σ w*r): {contrib.sum()*100:+.4f}%")
-print("=" * 60)
-print("\n各品种收益贡献（由大到小，单位 %）：")
-contrib_pct = (contrib * 100).sort_values(ascending=False)
-for a, v in contrib_pct.items():
-    tag = "  <<< 负贡献(亏损来源)" if v < 0 else ""
-    print(f"  {a:>12s} : {v:+.4f}%{tag}")
-
-neg = contrib_pct[contrib_pct < 0]
-print("\n负贡献品种合计 : {:.4f}%".format(neg.sum()))
-if len(neg):
-    worst = neg.idxmin()
-    print(f"最大亏损来源   : {worst}  贡献 {neg.min()*100:+.4f}%  "
-          f"(占全部负贡献 {neg.min()/neg.sum()*100:.1f}%)")
+print(f"区间 {S.date()} ~ {E.date()}  价格涨跌幅 × 区间平均权重 的贡献分解")
+print(f"{'资产':>12s} {'区间涨跌':>10s} {'平均权重':>9s} {'贡献(pct)':>10s}")
+for _, r in df.iterrows():
+    flag = "  <<< 亏损来源" if r.contrib < 0 else ""
+    print(f"{r.asset:>12s} {r.ret*100:>+9.2f}% {r.avg_w*100:>8.2f}% {r.contrib*100:>+9.3f}%{flag}")
+asset_sum = df.contrib.sum()
+print(f"{'资产端合计':>12s} {'':>10s} {'':>9s} {asset_sum*100:>+9.3f}%")
+print(f"\n策略净值区间几何收益(含现金管理): {geo_nav*100:+.3f}%")
+neg = df[df.contrib < 0]
+print(f"负贡献(亏损来源)合计: {neg.contrib.sum()*100:+.3f}%")
+print("亏损来源明细(由大到小):")
+for _, r in neg.iterrows():
+    print(f"  {r.asset:>12s} 贡献 {r.contrib*100:+.3f}%  占全部负贡献 {r.contrib/neg.contrib.sum()*100:5.1f}%")
+print(f"  => 最大单一亏损来源: {neg.asset.iloc[0]} ({neg.contrib.iloc[0]*100:+.3f}%)")
