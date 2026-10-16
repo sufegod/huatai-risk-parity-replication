@@ -1,0 +1,13 @@
+{
+  "representative_date": "2025-12-31",
+  "tilted_assets": [
+    "沪深300ETF",
+    "中证1000ETF"
+  ],
+  "tilted_multiplier": 2.0,
+  "other_multiplier": 1.0,
+  "solver_success": true,
+  "iterations": 8,
+  "rc_max_error": 2.7533531010703882e-14,
+  "weight_sum_error": 0.0
+}
